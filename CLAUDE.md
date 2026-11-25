@@ -22,6 +22,12 @@ prefix (`MCSuser`, `MCSweb`, and so on). Licensed AGPL-3.0. Repo: https://github
 Read `v2/docs/PRINCIPLES.md` for what the project is for and how it behaves, `v2/INSTALL.md` for how it is installed,
 and `SECURITY.md` for the trust model and how to report a problem.
 
+## Where this started
+
+`Archive-v1/` is the first version of this project, and it is the maintainer's own work. It is kept to show where
+Magrathea began. It is not supported: do not install it and do not change it. v2 grew from its ideas (a dedicated
+`minecraft` user, a sandboxed systemd unit, and a socket for the console).
+
 ## How Claude is used here
 
 Much of the code, including the Python and the permission setup, was written with Claude Code. The design, the
