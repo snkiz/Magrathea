@@ -1,0 +1,17 @@
+#!/bin/bash
+### Library directory
+LIB="$(cd "$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/../lib/MCS" && pwd)"
+# shellcheck source=/dev/null
+source "$LIB/MCS.lib"
+### Var
+CHOOSE="Choose an instance, you may browse the MC user's home directory by typing none. Or Ctrl-C to exit: "
+#############################################################################
+chooser
+if [[ "$INSTANCE" == "none" ]]; then
+  open_dir "$mcsH"
+else
+  need_instance
+  browse
+fi
+
+exit 0

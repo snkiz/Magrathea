@@ -1,0 +1,24 @@
+## Scheduled MCS backups. Installed (copied, root-owned) to /etc/systemd/system by MCSuser.
+## Run by MCSbackup.timer; each server's own schedule lives in the web page / `MCSbackup schedule`.
+[Unit]
+Description=MCS scheduled backups (warn, stop, copy, check, start again)
+After=network.target
+
+[Service]
+Type=oneshot
+User=minecraft
+Group=minecraft
+UMask=0007
+Environment=PYTHONDONTWRITEBYTECODE=1
+# Warning countdown + stop + copy + start can take a while on a big world.
+TimeoutStartSec=3h
+ExecStart=/usr/bin/python3 -I /opt/minecraft/.local/lib/MCS/mcsbackup.py run-due
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+ReadWritePaths=/opt/minecraft

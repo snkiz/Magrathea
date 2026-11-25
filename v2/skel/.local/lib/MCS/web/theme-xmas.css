@@ -1,0 +1,20 @@
+/* Seasonal theme: Christmas. Deep forest green with a faint green tint in the greys.
+   NOT wired in yet. To use it, load this file AFTER style.css and put data-season="xmas" on <html>
+   (for example automatically from Dec 1 to Jan 1, or a switch in Settings).
+   Only colours change; fonts and layout stay as they are.
+   The green is deliberately deep and muted so it stays clear of Modrinth's bright mint.
+   "Running" stays a lighter green (--ok) and trouble stays red, so the accent does not mean "ok".
+   Contrast checked (WCAG ratios): accent on background 6.0, on panel 5.2; button ink on accent 7.2;
+   light mode accent on background 6.0, white on accent 6.5. */
+:root[data-season="xmas"] {
+  --bg: #f3f6f3; --panel: #ffffff; --panel-2: #eaf0eb; --line: #d6e0d8; --text: #17211b; --muted: #5a6b60;
+  --accent: #1f6b3a; --accent-ink: #ffffff; --accent-soft: #e3f1e7; --danger: #b3261e; --warn: #7a6200;
+  --ok: #2b6e2f; --idle: #8a948d; --console-bg: #101713; --console-text: #dfeae2;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-season="xmas"] {
+    --bg: #1e2622; --panel: #27312c; --panel-2: #2f3b35; --line: #3f4d46; --text: #e8efe9; --muted: #a3b3a9;
+    --accent: #5cb377; --accent-ink: #08170d; --accent-soft: #2c4636; --danger: #ff7d7d; --warn: #e8cf4a;
+    --ok: #8fd19e; --idle: #7d8a82; --console-bg: #151c18; --console-text: #e8efe9;
+  }
+}

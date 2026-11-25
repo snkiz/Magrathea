@@ -1,0 +1,5 @@
+#!/bin/bash
+# Download server jars and mods (Modrinth / CurseForge). See: MCSfetch --help
+LIB="$(cd "$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/../lib/MCS" && pwd)"
+command -v python3 >/dev/null || { echo "MCSfetch needs python3 (sudo apt install python3)." >&2; exit 1; }
+exec python3 "$LIB/mcsfetch.py" "$@"

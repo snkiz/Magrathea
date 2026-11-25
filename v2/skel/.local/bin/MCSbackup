@@ -1,0 +1,10 @@
+#!/bin/bash
+# Backups for MCS servers: scheduled, checked, restorable.
+#   MCSbackup now <server>          safe backup now (warns players, stops, copies, starts again)
+#   MCSbackup live <server>         quick copy while running (can be damaged)
+#   MCSbackup list <server>
+#   MCSbackup restore <server> <file>   saves the current state first, so it can be undone
+#   MCSbackup schedule <server> [--time 04:00 --days 0,1,2,3,4,5,6 --keep 7 --warn 2 --on|--off]
+LIB="$(cd "$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/../lib/MCS" && pwd)"
+command -v python3 >/dev/null || { echo "MCSbackup needs python3 (sudo apt install python3)." >&2; exit 1; }
+exec python3 -I "$LIB/mcsbackup.py" "$@"

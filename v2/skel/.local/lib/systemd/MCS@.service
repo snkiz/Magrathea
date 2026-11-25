@@ -1,0 +1,53 @@
+## Minecraft server management systemd service. Screen not required!
+## Installed (copied, root-owned) to /etc/systemd/system by MCSuser.
+[Unit]
+# %i is the server folder name.
+Description=Minecraft server %i
+After=network.target MCS@%i.socket
+Requires=MCS@%i.socket
+StartLimitIntervalSec=60
+StartLimitBurst=2
+
+[Service]
+# MCS-run tells systemd the server is ready once it logs 'Done (...)!',
+# so 'systemctl start' only returns when the server is really up.
+Type=notify
+NotifyAccess=all
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+User=minecraft
+Group=minecraft
+UMask=0007
+
+ProtectHome=true
+ProtectSystem=strict
+PrivateDevices=true
+NoNewPrivileges=true
+PrivateTmp=true
+InaccessiblePaths=/root /srv -/var -/media -/lost+found
+# The server can only write to its own instance folder.
+ReadWritePaths=/opt/minecraft/instance/%i
+RuntimeDirectory=MCS-%i
+
+WorkingDirectory=/opt/minecraft/instance/%i
+EnvironmentFile=/opt/minecraft/instance/%i/service.conf
+
+Restart=on-failure
+RestartSec=10
+# 143 = java exiting on SIGTERM.
+SuccessExitStatus=143 SIGTERM
+
+# Console input arrives through the FIFO in MCS@%i.socket. Sockets= is what
+# attaches it; without it systemd fails with "Expected exactly one socket".
+Sockets=MCS@%i.socket
+StandardInput=socket
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=MCS-%i
+
+ExecStart=/opt/minecraft/.local/bin/MCS-run %i
+ExecStop=/opt/minecraft/.local/bin/MCS-stop %i
+
+[Install]
+WantedBy=multi-user.target

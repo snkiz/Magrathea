@@ -1,0 +1,15 @@
+## Copies new backups to a separate folder the minecraft user cannot reach. Installed (root-owned) by MCSuser;
+## only started by `sudo MCSoffbox set <folder>`, which enables the timer.
+[Unit]
+Description=MCS off-box backup copy
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I /usr/local/lib/MCS/mcsoffbox.py run
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=6h
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true

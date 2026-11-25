@@ -1,0 +1,5 @@
+# Always store and check out text with Unix line endings: a stray carriage return after
+# "#!/bin/bash" makes a script fail on Linux ("bad interpreter"), and the scripts are
+# edited on Windows too.
+* text=auto eol=lf
+*.ttf binary

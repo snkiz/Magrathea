@@ -1,0 +1,11 @@
+[Unit]
+Description=Console input for Minecraft server %i
+PartOf=MCS@%i.service
+
+[Socket]
+ListenFIFO=%t/MCS@%i.stdin
+# Only the minecraft user and group may send console commands.
+SocketUser=minecraft
+SocketGroup=minecraft
+SocketMode=0660
+RemoveOnStop=true

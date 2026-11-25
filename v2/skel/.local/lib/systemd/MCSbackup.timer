@@ -1,0 +1,12 @@
+## Wakes MCSbackup every 10 minutes; it only does something when a server's backup time has come.
+## Installed (copied, root-owned) to /etc/systemd/system by MCSuser.
+[Unit]
+Description=MCS scheduled backups, checked every 10 minutes
+
+[Timer]
+OnCalendar=*:0/10
+AccuracySec=1min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

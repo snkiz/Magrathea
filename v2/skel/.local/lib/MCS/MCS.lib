@@ -1,0 +1,93 @@
+#!/bin/bash
+#### MCS Functions ####
+# Sourced by the MCS<tool> scripts; do not run directly.
+# The caller must set LIB (this directory) and CHOOSE (prompt text) first.
+#######################
+### VAR
+INSTANCE="${1:-}"
+SDIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+mcsH="$(cd "$SDIR/../.." && pwd)"
+mcsHI="$mcsH/instance"
+xhWARN="Reminder, xhost +si:localuser:minecraft must be enabled on YOUR profile."
+#############################################################################
+open_dir () {  ### Open $1 in the desktop file manager, if there is one. Never fails.
+ if [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && command -v xdg-open >/dev/null; then
+   xdg-open "$1" >/dev/null 2>&1 &
+   return 0
+ fi
+ echo "No desktop session available here, so no file manager. Use this folder directly: $1"
+ return 1
+}
+list_instances () {  ### Fill the LIST array with instance folder names.
+ mapfile -t LIST < <(find "$mcsHI" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort)
+}
+valid_name () {  ### Letters, numbers, dot, underscore, dash. No leading dot.
+ [[ "$1" =~ ^[A-Za-z0-9_-][A-Za-z0-9._-]*$ ]]
+}
+in_list () {  ### Exact match of $1 against LIST.
+ local x
+ for x in "${LIST[@]}"; do [[ "$x" == "$1" ]] && return 0; done
+ return 1
+}
+chooser () {  ### Get input.
+ while [[ -z "$INSTANCE" ]]; do
+   echo -e "~~MCS Instance Chooser~~\n"
+   printf '%s\n' "${LIST[@]}"; echo
+   read -rp "$CHOOSE" INSTANCE
+ done
+}
+need_instance () {  ### Exit unless INSTANCE is an existing instance.
+ if ! valid_name "$INSTANCE" || ! in_list "$INSTANCE"; then
+   echo "No instance called '$INSTANCE'. If you wish to create a new instance use MCScreate." >&2
+   exit 1
+ fi
+}
+import () {  ### Open import dir, and copy whatever is put there.
+ local src="$mcsH/import" dst="$mcsHI/$INSTANCE"
+ mkdir -p "$src/mods" "$src/config"
+ echo -e "$xhWARN"
+ echo -e "Copy your files into the import folder. The file manager may return \n\
+immediately, so come back here and press Enter when you are done copying. \n\
+WARNING - the import folder is emptied on completion."
+ open_dir "$src"
+ read -rp "Press Enter when finished: " _
+ cp -rv "$src"/. "$dst"/
+ find "$src" -mindepth 1 -delete
+ mkdir -p "$src/mods" "$src/config"
+}
+conf () {  ### service and properties files
+ local d="$mcsHI/$INSTANCE" jars=()
+ mapfile -t jars < <(find "$d" -maxdepth 1 -name '*.jar' -printf '%f\n')
+ if [[ ! -f "$d/server.properties" ]]; then
+   echo -e "\nserver.properties not found! Installing..."
+   install -m 660 "$LIB/server.properties" "$d/server.properties"
+   sed -i -e "s|^level-name=NULL|level-name=${INSTANCE}|" \
+          -e "s|^motd=.*|motd=Welcome to ${INSTANCE}|" "$d/server.properties"
+ fi
+ if [[ ! -f "$d/service.conf" ]]; then
+   echo -e "\nservice.conf not found! Installing..."
+   install -m 660 "$LIB/service.conf" "$d/service.conf"
+   if [[ ${#jars[@]} -eq 1 ]]; then
+     echo "Using jar: ${jars[0]}"
+     sed -i "s|^SERVER=NULL|SERVER=${jars[0]}|" "$d/service.conf"
+   else
+     echo "Found ${#jars[@]} jar files in the instance; set SERVER= in service.conf yourself."
+   fi
+ fi
+ echo
+ read -rp "Would you like to edit the server.properties? Y or n: " -n 1
+ echo
+ if [[ $REPLY =~ ^[Yy]$ ]]; then "${EDITOR:-nano}" "$d/server.properties"; fi
+ echo -e "\nThe service.conf contains your jar file, java version, ram allocation, \n\
+java arguments and a shutdown message with a configurable timer. \n"
+ read -rp "Would you like to edit the service.conf? Y or n: " -n 1
+ echo
+ if [[ $REPLY =~ ^[Yy]$ ]]; then "${EDITOR:-nano}" "$d/service.conf"; fi
+}
+browse () {  ### Open INSTANCE folder.
+ echo -e "$xhWARN"
+ echo "This is running as the minecraft user." && sleep 2
+ open_dir "$mcsHI/$INSTANCE"
+}
+
+list_instances

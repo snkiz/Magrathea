@@ -1,0 +1,25 @@
+#!/bin/bash
+# Run by MCS@.service (ExecStop): warn players, save, send 'stop', and wait
+# for the server to exit on its own. MAINPID is set by systemd.
+inst="$1"
+fifo="/run/MCS@${inst}.stdin"
+timer="${TIMER:-10}"
+
+say () {  # timeout so a hung server can't block the stop forever
+  timeout 5 sh -c 'printf "%s\n" "$1" > "$2"' _ "$1" "$fifo"
+}
+
+say "say ${SIGNOFF//@TIMER@/$timer}"
+sleep "$timer"
+say "say ${SAVEnX}"
+sleep 2
+say "save-all"
+sleep 2
+say "stop"
+
+# Wait up to 90s for the wrapper (MAINPID) to finish; systemd kills it after that.
+for _ in $(seq 1 90); do
+  kill -0 "$MAINPID" 2>/dev/null || exit 0
+  sleep 1
+done
+exit 0

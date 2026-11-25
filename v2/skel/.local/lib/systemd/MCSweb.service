@@ -1,0 +1,31 @@
+## MCS web interface. Installed (copied, root-owned) to /etc/systemd/system by MCSuser.
+## Enable with:  sudo systemctl enable --now MCSweb
+## Change port/address with:  sudo systemctl edit MCSweb   (override ExecStart)
+[Unit]
+Description=MCS web interface
+After=network.target
+
+[Service]
+User=minecraft
+Group=minecraft
+# Lets the UI read each server's console log (journal) without being root.
+SupplementaryGroups=systemd-journal
+UMask=0007
+Environment=PYTHONDONTWRITEBYTECODE=1
+# 127.0.0.1 only. There is no TLS and the login is a personal key, so do not
+# expose it to a network without Tailscale or a reverse proxy in front.
+ExecStart=/usr/bin/python3 -I /opt/minecraft/.local/lib/MCS/mcsweb.py --listen 127.0.0.1 --port 8080
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/opt/minecraft
+
+[Install]
+WantedBy=multi-user.target

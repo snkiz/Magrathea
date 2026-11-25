@@ -1,0 +1,38 @@
+#!/bin/bash
+# Started by MCS@.service (ExecStart). Runs the server, names the process after
+# the instance, and tells systemd when the server is ready.
+# Settings (SERVER, JAVA_HOME, RAM, ARGS) come from service.conf via systemd.
+inst="$1"
+
+if [[ -z "$SERVER" || "$SERVER" == "NULL" || ! -f "$SERVER" ]]; then
+  echo "MCS: SERVER is not set to an existing jar in service.conf (SERVER='$SERVER')." >&2
+  exit 1
+fi
+
+java_bin="java"
+[[ -n "$JAVA_HOME" ]] && java_bin="$JAVA_HOME/bin/java"
+real="$(readlink -f "$(command -v "$java_bin")")" || real=""
+if [[ -z "$real" || ! -x "$real" ]]; then
+  echo "MCS: cannot find java ($java_bin). Check JAVA_HOME in service.conf." >&2
+  exit 1
+fi
+
+if [[ "$(grep -s '^online-mode=' server.properties | cut -d= -f2 | tr -d '[:space:]')" == "false" ]]; then
+  echo "MCS WARNING: online-mode=false. Players are not checked against Mojang; anyone can join as any name, including an operator's." >&2
+fi
+
+# A symlink named mcs-<instance> makes the process show up under that name in
+# top/htop/system monitors instead of plain 'java'.
+name="$RUNTIME_DIRECTORY/mcs-$inst"
+ln -sf "$real" "$name"
+
+# RAM and ARGS are space separated option lists, so they are left unquoted on purpose.
+# shellcheck disable=SC2086
+"$name" $RAM $ARGS -Dmcs.instance="$inst" -jar "$SERVER" nogui 2>&1 \
+  | while IFS= read -r line; do
+      printf '%s\n' "$line"
+      if [[ "$line" == *'For help, type "help"'* ]]; then
+        systemd-notify --ready --status="Server is up"
+      fi
+    done
+exit "${PIPESTATUS[0]}"

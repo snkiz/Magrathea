@@ -1,0 +1,7 @@
+#!/bin/bash
+# MCS web interface. Normally run by the MCSweb systemd service.
+#   Login keys and the audit log are managed with: sudo MCSkey add|list|revoke <name> | audit
+#   MCSweb --port 9090      run in the foreground (as the minecraft user)
+LIB="$(cd "$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/../lib/MCS" && pwd)"
+command -v python3 >/dev/null || { echo "MCSweb needs python3 (sudo apt install python3)." >&2; exit 1; }
+exec python3 -I "$LIB/mcsweb.py" "$@"

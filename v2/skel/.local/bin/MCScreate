@@ -1,0 +1,71 @@
+#!/bin/bash
+### library directory ###
+LIB="$(cd "$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/../lib/MCS" && pwd)"
+# shellcheck source=/dev/null
+source "$LIB/MCS.lib"
+### Var ###
+EULA="$LIB/eula.txt"
+CHOOSE="What would you like your server to be called? "
+###############################################################################
+### EULA check ###
+if [[ ! -f "$LIB/EULA.token" ]]; then
+  printf "%s" "$(<"$EULA")" && echo -e "\nYou will only have to do this once."
+  read -rp "Do you agree? true or false: " -n 1
+  echo
+  if [[ ! $REPLY =~ ^[Tt]$ ]]; then
+    echo "You must agree to the eula to run a server." && exit 1
+  fi
+  sed -i -e "s/eula=false/eula=true/g" "$EULA"
+  echo "true" > "$LIB/EULA.token"
+fi
+### ask for the name of the server <instance> if it wasn't named on start ###
+chooser
+while ! valid_name "$INSTANCE" || in_list "$INSTANCE"; do
+  if valid_name "$INSTANCE"; then
+    echo -e "\n$INSTANCE already exists. Use MCSimport, MCSconf and MCSbrowse to edit an existing instance."
+  else
+    echo -e "\nNames may only use letters, numbers, dot, underscore and dash."
+  fi
+  read -rp " $CHOOSE or Ctrl-C to exit: " INSTANCE
+done
+### create <instance> folder ###
+mkdir -- "$mcsHI/$INSTANCE" || exit 1
+# The token records your agreement; the template eula.txt can be reset to
+# false by reinstalling the MCS files, so always write the instance's copy true.
+sed 's/^eula=false/eula=true/' "$EULA" > "$mcsHI/$INSTANCE/eula.txt"
+### copy jar file and mods/configs. ###
+echo -e "\nCopy your jar into the import folder. If you have mods put them \n\
+into the mods folder, and if you've configured them put the configs in the config \n\
+folder."
+import
+### install server.properties and service.conf ###
+echo -e "\nExperimental options must be enabled in server.properties \n\
+before initialization/world gen."
+conf
+### game port and first player ###
+fetch="$(cd "$LIB/../../bin" && pwd)/MCSfetch"
+suggest="$("$fetch" port)"
+echo -e "
+Each server needs its own game port. A port other than 25565 cuts down random scanner 
+traffic, but it is not security."
+while :; do
+  read -rp "Game port [$suggest]: " port || { echo "No input; stopping. $INSTANCE exists, finish with MCSfetch setup/player." >&2; exit 1; }
+  port="${port:-$suggest}"
+  [[ "$port" =~ ^[0-9]+$ ]] && "$fetch" setup "$INSTANCE" --port "$port" && break
+done
+echo -e "
+The whitelist is on: only listed players can join. Enter your Minecraft name to be 
+whitelisted and made an operator (add others later with: MCSfetch player $INSTANCE <name>)."
+while :; do
+  read -rp "Your Minecraft name: " who || { echo "No input; stopping. $INSTANCE exists, finish with MCSfetch setup/player." >&2; exit 1; }
+  [[ -n "$who" ]] && "$fetch" player "$INSTANCE" "$who" --op && break
+done
+### done ###
+echo -e "\nYour Minecraft server $INSTANCE is ready. \n\
+Use 'systemctl start MCS@$INSTANCE' to run it, and 'systemctl stop MCS@$INSTANCE' to stop it. \n\
+See README in the minecraft home folder for details"
+read -rp "Would you like to browse $INSTANCE ? Y or n: " -n 1
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then browse; fi
+
+exit 0

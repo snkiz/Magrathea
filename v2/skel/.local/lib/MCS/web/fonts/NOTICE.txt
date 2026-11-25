@@ -1,0 +1,11 @@
+Shantell Sans
+
+Copyright 2022 The Shantell Sans Project Authors (https://github.com/arrowtype/shantell-sans)
+Designed by Stephen Nixon, Anya Danilova and Shantell Martin (Arrow Type, https://arrowtype.com).
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+The full license text is in OFL.txt next to this file (taken from the project repository above).
+It is also available with a FAQ at https://openfontlicense.org
+
+ShantellSans.ttf is the unmodified variable font, renamed only to drop the axis list from its file name.
+MCS serves it from this machine so the page never asks another site for a font.

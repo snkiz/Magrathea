@@ -1,0 +1,9 @@
+# Built bundles and anything that could hold a secret never belong in the repo.
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.key
+*.pem
+.env
+.env.*

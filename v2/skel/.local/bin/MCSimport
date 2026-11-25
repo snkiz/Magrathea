@@ -1,0 +1,15 @@
+#!/bin/bash
+### Library directory
+LIB="$(cd "$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/../lib/MCS" && pwd)"
+# shellcheck source=/dev/null
+source "$LIB/MCS.lib"
+### Var
+CHOOSE="Choose the instance you want to import to. Ctrl-C to exit "
+#############################################################################
+chooser
+need_instance
+echo -e "\nPut your files to be imported in the import folder. You can in fact \n\
+use this to import an entire instance.\n" && sleep 2
+import
+
+exit 0

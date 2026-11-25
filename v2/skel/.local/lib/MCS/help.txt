@@ -1,0 +1,74 @@
+## Author: snkiz
+## Sat 31 Aug 2024 04:11:32 AM EDT
+## License: Creative Commons. 
+## It's just some bash I cobbled together from bits of stack exchange.
+
+## The latest Official Mincraft server jar can be found here;
+## *** https://www.minecraft.net/en-us/download/server ***
+
+ Template files are located in the minecraft home directory under .local/lib
+ Service/Console Controls are run as your native user. MCS Scripts are run
+ under the minecraft user. Things in <these brakets> are varibles, do not
+ include the brackets.
+ 
+ Reminder, xhost +si:localuser:minecraft Must be enabled on YOUR profile.
+ If you are not running an xserver, Browse and Import will not work properly.
+ You will have to copy your jar manually, and run MCSconf to at least fill in
+ the feilds marked NULL. If using wayland; 
+ pkexec -u minecraft <filebrowser> should be used instead. 
+ Your milage may vary.
+
+ ./MCSuser # Creates a minecraft user, inststalls systemd service, fix Perms.
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+##                        ~~~~Service Controls~~~~~~                            ## 
+## Enable or Disable Autostart                                                  ##
+## sudo systemctl <enable/disable> MCS@<instance>                               ##
+## ---------------------------------------------------------------------------- ##
+## systemctl start MCS@<instance>     # Starts the service if it wasn't running ##
+## systemctl stop MCS@<instance>      # Stops the service                       ##
+## systemctl status MCS@<instance>    # Find out how the service is doing       ##
+##               ~~~~Console Controls. ctl+C to exit~~~~~                       ##
+## journalctl -u MCS@<instance> -f             # Monitor the console            ##
+## Console commands need the 'minecraft' group, which only applies after you   ##
+## log out and back in (or run: newgrp minecraft). Until then use:             ##
+## echo "<command>" | sudo tee /run/MCS@<instance>.stdin                       ##
+## ('sudo echo ... > file' will NOT work: your shell opens the file, not sudo.)##
+## If a server fails to start twice in a minute (bad service.conf), systemd    ##
+## refuses further starts. After fixing it run:                                ##
+## sudo systemctl reset-failed MCS@<instance> MCS@<instance>.socket            ##
+## echo "<comand>" > /run/MCS@<instance>.stdin # Send commands to the console   ##
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+##                           ~~~~MCS Scripts~~~~                                ##
+## ./MCScreate   # Runs everything to create a new instance.                    ##
+## ./MCSimport   # Opens import folder so you can copy your jar, mods/configs.  ##
+## ./MCSconf     # Copies the service.conf and server.properties                ##
+## ./MCSbrowse   # Opens the <instance> folder or the minecraft home folder.    ##
+## MCSweb       # Browser interface: sudo systemctl enable --now MCSweb         ##
+##               # then http://localhost:8080. Sign in with a personal key:     ##
+##   sudo MCSkey add <name>  # make a key (shown once; terminal + sudo only)    ##
+##   sudo MCSkey list | revoke <name> | audit   # who has keys / who did what   ##
+##   Only root can change keys: the web page and the minecraft user cannot.     ##
+## ./MCSfetch    # Downloads server jars and mods. MCSfetch --help for more.   ##
+##   MCSfetch jar <instance> --type vanilla|paper|fabric [--mc 1.21.11]        ##
+##   MCSfetch search <text> --instance <instance>                              ##
+##   MCSfetch add <instance> <mod> ...     # also fetches required mods        ##
+##   MCSfetch list|update|remove <instance>                                    ##
+##   MCSfetch player <instance> <name> [--op]   # whitelist a player           ##
+##   Whitelist is ON. A running server needs: whitelist reload (console).       ##
+##   The MCS tools are on your PATH (they run as the minecraft user via sudo).  ##
+##   CurseForge needs a free API key in ~/.config/MCS/curseforge.key           ##
+## MCSbackup    # Scheduled backups (on by default, 04:00 daily, keeps 7).      ##
+##   MCSbackup now <server>      # warn players, stop, copy, check, start again ##
+##   MCSbackup list|restore|test|schedule <server> ...  (restore saves the      ##
+##   current state first, so a restore can be undone; test unpacks a backup     ##
+##   into a scratch folder and checks it). Keeps 7 daily + 4 weekly by default. ##
+## MCSoffbox    # A SEPARATE copy of the backups that helpers and mods can't    ##
+##   delete (a second drive or another machine). Needs sudo:                    ##
+##   sudo MCSoffbox set <folder>   # copy new backups there every hour         ##
+##   sudo MCSoffbox status|run|off # it never deletes anything in <folder>      ##
+## ./MCShelp     # Shows this file.                                             ##
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+

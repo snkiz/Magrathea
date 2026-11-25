@@ -1,0 +1,3 @@
+#!/bin/bash
+# Convenience entry point: runs the real installer inside skel/.
+exec "$(dirname "$(readlink -f "$0")")/skel/.local/bin/MCSuser" "$@"
