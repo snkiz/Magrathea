@@ -42,7 +42,7 @@ jobs:
               bash -n "$f" || { echo "syntax error in $f" >&2; status=1; }
             fi
           done
-          bash -n v2/skel/.local/lib/MCS/MCS.lib || status=1
+          bash -n v2/mcs/lib/MCS/MCS.lib || status=1
           exit $status
 
       - name: shellcheck (errors only)
@@ -52,8 +52,8 @@ jobs:
             case "$f" in *.ttf) continue;; esac
             head -n1 "$f" | grep -qE '^#!.*(bash|/sh)' && echo "$f"
           done)
-          shellcheck -s bash -S error $files v2/skel/.local/lib/MCS/MCS.lib
-          shellcheck -s bash -S warning $files v2/skel/.local/lib/MCS/MCS.lib || echo "(warnings above are not enforced yet)"
+          shellcheck -s bash -S error $files v2/mcs/lib/MCS/MCS.lib
+          shellcheck -s bash -S warning $files v2/mcs/lib/MCS/MCS.lib || echo "(warnings above are not enforced yet)"
 
       - name: Python compiles
         run: |
@@ -61,4 +61,4 @@ jobs:
           python3 -m py_compile $(git ls-files '*.py')
 
       - name: JavaScript parses
-        run: node --check v2/skel/.local/lib/MCS/web/app.js
+        run: node --check v2/mcs/lib/MCS/web/app.js

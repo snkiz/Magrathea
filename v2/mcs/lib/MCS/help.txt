@@ -6,7 +6,8 @@
 ## The latest Official Mincraft server jar can be found here;
 ## *** https://www.minecraft.net/en-us/download/server ***
 
- Template files are located in the minecraft home directory under .local/lib
+ The MCS program, with its template files, is in /opt/mcs (owned by root). Your
+ servers and backups are in /opt/minecraft.
  Service/Console Controls are run as your native user. MCS Scripts are run
  under the minecraft user. Things in <these brakets> are varibles, do not
  include the brackets.

@@ -39,7 +39,7 @@ To run comands as the minecraft user you will need to run:
   
   
 Once logged in ( you will see your prompt change from <yourusername>@<hostname> 
-to minecraft@<hostname>. ) Then you can change directory ( cd ~/toolbox && ls )
+to minecraft@<hostname>. ) Then you can change directory ( ls /opt/mcs/bin )
 and run any of the MCS<tools>. **NOTES** Except MCSuser.
 
 ./MCScreate

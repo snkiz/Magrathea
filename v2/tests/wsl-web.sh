@@ -37,7 +37,7 @@ test "$(sudo -u minecraft grep -c "$TOKEN" /etc/MCS/keys.json)" = 0 && pass "key
 sudo -u minecraft test ! -e /opt/minecraft/.config/MCS/web.token && pass "old shared web.token is gone" || bad "web.token still exists"
 sudo -u minecraft sh -c "echo x >> /etc/MCS/keys.json" 2>/dev/null && bad "minecraft user can write the keys file" || pass "minecraft user cannot write the keys file"
 sudo -u minecraft sh -c "rm -f /etc/MCS/keys.json" 2>/dev/null; test -s /etc/MCS/keys.json && pass "minecraft user cannot delete the keys file" || bad "keys file deleted by minecraft"
-sudo -u minecraft python3 -I /usr/local/lib/MCS/mcskey.py revoke "$KEYNAME" </dev/null >/dev/null 2>&1; sudo -u minecraft grep -q "$KEYNAME" /etc/MCS/keys.json && pass "minecraft user cannot revoke a key" || bad "minecraft user revoked a key"
+sudo -u minecraft python3 -I /opt/mcs/lib/MCS/mcskey.py revoke "$KEYNAME" </dev/null >/dev/null 2>&1; sudo -u minecraft grep -q "$KEYNAME" /etc/MCS/keys.json && pass "minecraft user cannot revoke a key" || bad "minecraft user revoked a key"
 req GET /api/auth; want "auth reports who is signed in" 200 "\"who\": \"$KEYNAME\""
 $MCW add "$KEYNAME" >/dev/null 2>&1 && bad "duplicate key name accepted" || pass "duplicate key name refused"
 OTHER="$($MCW add "$KEYNAME-2" --quiet)"
@@ -156,7 +156,7 @@ sudo -n rm -rf /opt/minecraft/instance/webmade 2>/dev/null || rm -rf /opt/minecr
 
 echo "-- font and footer"
 H=$(curl -sI $B/fonts/ShantellSans.ttf); grep -qi "content-type: font/ttf" <<<"$H" && grep -qi "max-age=604800" <<<"$H" && pass "the font is served from this machine, cacheable" || bad "font not served right" "$H"
-grep -q "not affiliated" /opt/minecraft/.local/lib/MCS/web/app.js && pass "the not-affiliated footer is in the page" || bad "footer missing"
+grep -q "not affiliated" /opt/mcs/lib/MCS/web/app.js && pass "the not-affiliated footer is in the page" || bad "footer missing"
 
 echo; [[ $fail -eq 0 ]] && echo "ALL PASSED" || echo "SOME FAILED"
 exit $fail

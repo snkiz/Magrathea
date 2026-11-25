@@ -6,13 +6,13 @@
 set -u
 B=http://localhost:8080
 J="$(mktemp)"; trap 'rm -f "$J" "$J".*; /usr/local/bin/MCSkey revoke "bk$$" >/dev/null 2>&1; as_mc "rm -rf $I/bk1 $I/bk2 $I/bk3 $BK/bk1-* $BK/bk2-* $BK/bk3-*"; rm -f /opt/minecraft/.config/MCS/backup/bk[123].json' EXIT
-LIBDIR=/opt/minecraft/.local/lib/MCS
+LIBDIR=/opt/mcs/lib/MCS
 I=/opt/minecraft/instance; BK=/opt/minecraft/backups/instance
 fail=0
 pass () { echo "PASS  $1"; }
 bad () { echo "FAIL  $1"; [[ -n "${2:-}" ]] && echo "        $2"; fail=1; }
 as_mc () { su minecraft -s /bin/bash -c "$1"; }
-mcb () { as_mc "~/toolbox/MCSbackup $*"; }
+mcb () { as_mc "/opt/mcs/bin/MCSbackup $*"; }
 req () { local m="$1" p="$2" d="${3:-}"; local args=(-s -o "$J.body" -w '%{http_code}' -b "$J" -c "$J" -X "$m" -H 'X-MCS: 1' "$B$p"); [[ -n "$d" ]] && args+=(-H 'Content-Type: application/json' --data "$d"); CODE=$(curl "${args[@]}"); BODY=$(cat "$J.body"); }
 want () { if [[ "$CODE" == "$2" ]] && { [[ -z "${3:-}" ]] || grep -q -- "$3" <<<"$BODY"; }; then pass "$1"; else bad "$1 (got $CODE, wanted $2 ${3:-})" "$BODY"; fi; }
 waitjob () { local id; id=$(grep -o '"id": "[0-9a-f]*"' <<<"$BODY" | grep -o '[0-9a-f]\{12\}'); for _ in $(seq 1 150); do sleep 2; req GET /api/jobs/$id; grep -q '"state": "running"' <<<"$BODY" || break; done; }

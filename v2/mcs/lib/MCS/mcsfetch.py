@@ -36,9 +36,9 @@ from pathlib import Path
 VERSION = "2.0"
 UA = f"MCS-fetch/{VERSION}"
 
-LIB_DIR = Path(__file__).resolve().parent
-# <home>/.local/lib/MCS/mcsfetch.py  ->  <home>.  MCS_HOME overrides (testing).
-HOME = Path(os.environ.get("MCS_HOME") or LIB_DIR.parents[2])
+LIB_DIR = Path(__file__).resolve().parent  # the program (root-owned): templates, web files
+# The data folder (servers, backups, config) is separate from the program. MCS_HOME overrides it.
+HOME = Path(os.environ.get("MCS_HOME") or "/opt/minecraft")
 INSTANCES = HOME / "instance"
 
 ALLOWED_HOSTS = {
@@ -782,15 +782,16 @@ def used_ports(skip: str | None = None) -> dict[int, str]:
     out: dict[int, str] = {}
     if INSTANCES.is_dir():
         for d in sorted(INSTANCES.iterdir()):
-            if d.is_dir() and d.name != skip:
+            # NAME_RE keeps out the hidden restore-staging folder, which is not a server
+            if d.is_dir() and NAME_RE.match(d.name) and d.name != skip:
                 v = read_prop(d, "server-port", "25565")
                 if v.isdigit():
                     out[int(v)] = d.name
     return out
 
 
-def suggest_port() -> int:
-    used = used_ports()
+def suggest_port(skip: str | None = None) -> int:
+    used = used_ports(skip)  # skip: a server being created already has a folder with the template's port
     p = 25565
     while p in used:
         p += 1
@@ -822,7 +823,7 @@ def cmd_player(a) -> int:
 
 
 def cmd_port(a) -> int:
-    say(str(suggest_port()))
+    say(str(suggest_port(a.skip)))
     return 0
 
 
@@ -913,6 +914,7 @@ def main(argv: list[str] | None = None) -> int:
     s.set_defaults(fn=cmd_player)
 
     s = sub.add_parser("port", help="print the next free game port")
+    s.add_argument("--skip", help="ignore this instance (the one being created)")
     s.set_defaults(fn=cmd_port)
 
     s = sub.add_parser("setup", help="set an instance's game port")

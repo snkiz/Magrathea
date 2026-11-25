@@ -5,8 +5,8 @@
 #######################
 ### VAR
 INSTANCE="${1:-}"
-SDIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-mcsH="$(cd "$SDIR/../.." && pwd)"
+# The data folder (servers, backups, config) is separate from the program. MCS_HOME overrides it.
+mcsH="${MCS_HOME:-/opt/minecraft}"
 mcsHI="$mcsH/instance"
 xhWARN="Reminder, xhost +si:localuser:minecraft must be enabled on YOUR profile."
 #############################################################################
@@ -19,7 +19,7 @@ open_dir () {  ### Open $1 in the desktop file manager, if there is one. Never f
  return 1
 }
 list_instances () {  ### Fill the LIST array with instance folder names.
- mapfile -t LIST < <(find "$mcsHI" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort)
+ mapfile -t LIST < <(find "$mcsHI" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n' 2>/dev/null | sort)
 }
 valid_name () {  ### Letters, numbers, dot, underscore, dash. No leading dot.
  [[ "$1" =~ ^[A-Za-z0-9_-][A-Za-z0-9._-]*$ ]]

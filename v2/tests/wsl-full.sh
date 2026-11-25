@@ -15,26 +15,26 @@ install_stage () {
   hr "result"
   id minecraft; ls -la /opt/minecraft | head -20
   ls -l /etc/systemd/system/MCS@.service /etc/systemd/system/MCS@.socket
-  ls -l /opt/minecraft/toolbox
+  ls -l /opt/mcs/bin
   id "$SUDO_USER"
-  hr "MCSuser again (should be idempotent, answer n)"
-  (cd "$HERE" && echo n | ./MCSuser) 2>&1 | tail -n 8
+  hr "MCSuser again (should be idempotent: replaces the program, keeps the data)"
+  (cd "$HERE" && ./MCSuser) 2>&1 | tail -n 8
 }
 
 create_stage () {
   hr "MCScreate, driven non-interactively"
-  printf 't\n%s\n\nn\nn\n\nNotch\nn\n' "$INST" | as_mc "~/toolbox/MCScreate" 2>&1 | tail -n 30
+  printf 't\n%s\n\nn\nn\n\nNotch\nn\n' "$INST" | as_mc "/opt/mcs/bin/MCScreate" 2>&1 | tail -n 30
   hr "result"
   as_mc "ls -la ~/instance/$INST; echo; cat ~/instance/$INST/eula.txt; echo; grep -E '^(SERVER|JAVA_HOME|RAM)=' ~/instance/$INST/service.conf; grep -E '^(level-name|motd)=' ~/instance/$INST/server.properties"
   hr "MCScreate again with the same name must refuse, then accept a new one"
-  printf '%s\nbad name!\n%s2\n\nn\nn\n\nNotch\nn\n' "$INST" "$INST" | as_mc "~/toolbox/MCScreate" 2>&1 | grep -E "already exists|may only|ready"
+  printf '%s\nbad name!\n%s2\n\nn\nn\n\nNotch\nn\n' "$INST" "$INST" | as_mc "/opt/mcs/bin/MCScreate" 2>&1 | grep -E "already exists|may only|ready"
   as_mc "rm -rf ~/instance/${INST}2"
 }
 
 fetch_stage () {
   hr "MCSfetch jar + mod"
-  as_mc "~/toolbox/MCSfetch jar $INST --type fabric --mc 1.21.11" 2>&1
-  as_mc "~/toolbox/MCSfetch add $INST lithium" 2>&1
+  as_mc "/opt/mcs/bin/MCSfetch jar $INST --type fabric --mc 1.21.11" 2>&1
+  as_mc "/opt/mcs/bin/MCSfetch add $INST lithium" 2>&1
   # keep memory modest for the test machine
   as_mc "sed -i 's/^RAM=.*/RAM=-Xmx1G -Xms1G/' ~/instance/$INST/service.conf"
   as_mc "grep -E '^(SERVER|JAVA_HOME|RAM)=' ~/instance/$INST/service.conf; ls -la ~/instance/$INST ~/instance/$INST/mods"
@@ -80,7 +80,7 @@ teardown_stage () {
   systemctl daemon-reload
   [[ -n "${SUDO_USER:-}" ]] && gpasswd -d "$SUDO_USER" minecraft 2>&1 | tail -n 1
   userdel -r minecraft 2>&1 | tail -n 2; getent group minecraft >/dev/null && groupdel minecraft
-  rm -rf /opt/minecraft /etc/MCS /usr/local/lib/MCS
+  rm -rf /opt/mcs /opt/minecraft /etc/MCS /usr/local/lib/MCS
   id minecraft 2>&1 | head -n 1
 }
 

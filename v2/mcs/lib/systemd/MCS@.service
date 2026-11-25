@@ -46,8 +46,8 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=MCS-%i
 
-ExecStart=/opt/minecraft/.local/bin/MCS-run %i
-ExecStop=/opt/minecraft/.local/bin/MCS-stop %i
+ExecStart=/opt/mcs/bin/MCS-run %i
+ExecStop=/opt/mcs/bin/MCS-stop %i
 
 [Install]
 WantedBy=multi-user.target

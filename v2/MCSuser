@@ -1,3 +1,154 @@
 #!/bin/bash
-# Convenience entry point: runs the real installer inside skel/.
-exec "$(dirname "$(readlink -f "$0")")/skel/.local/bin/MCSuser" "$@"
+# Run as your normal user; it re-runs itself with sudo.
+#
+# Two separate trees:
+#   $prefix  (/opt/mcs)       the MCS program. Owned by root, so nothing running as the
+#                             minecraft user (a mod, the web page) can change the code.
+#   $mchome  (/opt/minecraft) your servers, backups and settings. Owned by minecraft.
+mcuser=minecraft
+mchome="/opt/$mcuser"
+prefix="/opt/mcs"
+SKEL="$(cd "$(dirname "$(readlink -f "$0")")/mcs" && pwd)"
+GREET="This script creates a system user and group called ${mcuser}.
+It installs the MCS program in ${prefix} (owned by root) and creates ${mchome},
+owned by ${mcuser}, where your server files live. It installs a systemd service
+to control your servers. It is safe to run on an existing install: your servers
+and backups are not touched, the program is replaced, and file permissions on
+your data are reset, so you can run it again if you have permission issues."
+#############################################################################
+# Sudo check
+if [[ $(id -u) -ne 0 ]]; then
+  echo "Hello ${USER}, you are not root. We will need that. Running with sudo (Ctrl+C to exit)." >&2
+  exec sudo "$0" "$@"
+fi
+[[ -n "$SUDO_USER" && "$SUDO_USER" != root ]] || { echo "Run this as a normal user via sudo, not as root directly." >&2; exit 1; }
+[[ -d "$SKEL/bin" && -d "$SKEL/lib" ]] || { echo "Cannot find the MCS program files next to this script ($SKEL)." >&2; exit 1; }
+echo -e "\n${SUDO_USER}, you are root.\n${GREET}"; sleep 2
+
+# Create the user if needed.
+echo -e "\nchecking for ${mcuser} user..."
+if ! id -u "$mcuser" >/dev/null 2>&1; then
+  echo "User ${mcuser} does not exist. Creating..."
+  useradd -r -m -U -d "$mchome" -s /bin/bash "$mcuser" || exit 1
+else
+  echo "${mcuser} user found."
+fi
+mkdir -p "$mchome"/{instance,import/mods,import/config,backups/mods,backups/PlayerData,backups/instance,.config/MCS}
+
+# Move a pre-split install out of the way: the program used to live inside the data folder,
+# where the minecraft user could change it. Keep the one thing that was real data.
+if [[ -d "$mchome/.local" ]]; then
+  echo "Found the old layout (program inside $mchome). Cleaning it up."
+  [[ -f "$mchome/.local/lib/MCS/EULA.token" && ! -f "$mchome/.config/MCS/EULA.token" ]] \
+    && cp "$mchome/.local/lib/MCS/EULA.token" "$mchome/.config/MCS/EULA.token"
+  rm -rf "$mchome/.local" "$mchome/toolbox"
+fi
+rm -f /usr/local/lib/MCS/mcskey.py /usr/local/lib/MCS/mcsoffbox.py
+rmdir /usr/local/lib/MCS 2>/dev/null || true
+
+# Install the program as root-owned files, replacing the old copy in one step.
+echo -e "\ninstalling the MCS program into ${prefix} (owned by root)..."
+rm -rf "${prefix:?}.new"
+install -d -m 755 -o root -g root "$prefix.new"
+cp -r "$SKEL"/. "$prefix.new"/
+chown -R root:root "$prefix.new"
+find "$prefix.new" -type d -exec chmod 755 {} +
+find "$prefix.new" -type f -exec chmod 644 {} +
+chmod 755 "$prefix.new"/bin/*
+[[ -d "$prefix" ]] && mv "$prefix" "$prefix.old"
+mv "$prefix.new" "$prefix"
+rm -rf "${prefix:?}.old"
+
+# Install the systemd units and the polkit rule as root-owned COPIES, with the install
+# folders filled in. They come from the files next to this script, not from a folder the
+# minecraft user can write.
+echo -e "
+installing MCS services..."
+render () {  # render <file> <destination>: the units are written for /opt/mcs and /opt/minecraft
+  local t; t="$(mktemp)"
+  sed -e "s|/opt/mcs|$prefix|g" -e "s|/opt/minecraft|$mchome|g" "$1" > "$t"
+  install -m 644 -o root -g root "$t" "$2"; rm -f "$t"
+}
+for u in MCS@.service MCS@.socket MCSweb.service MCSbackup.service MCSbackup.timer MCSoffbox.service MCSoffbox.timer; do
+  render "$SKEL/lib/systemd/$u" "/etc/systemd/system/$u"
+done
+systemctl daemon-reload
+# Scheduled backups are on by default: a world is real work. Each server's time can be changed
+# in the web page or with MCSbackup schedule. They only warn, stop and copy a server when its time comes.
+systemctl enable --now MCSbackup.timer >/dev/null 2>&1 || echo "NOTE: could not enable the backup timer; run: sudo systemctl enable --now MCSbackup.timer"
+# polkit lets the web interface start/stop MCS@* units (and nothing else).
+if [[ -d /etc/polkit-1/rules.d ]]; then
+  install -m 644 -o root -g root "$SKEL/lib/systemd/MCS.rules" /etc/polkit-1/rules.d/50-mcs.rules
+else
+  echo "NOTE: polkit is not installed, so the web interface cannot start/stop servers."
+  echo "      Install it (Debian/Ubuntu: sudo apt install polkitd) and run MCSuser again."
+  echo "      (pkexec, the command-line part, is not needed here; desktop systems already have it.)"
+fi
+# Java and acl are not needed to install, but a server will not start without Java, so say so now.
+if ! compgen -G "/usr/lib/jvm/*/bin/java" >/dev/null && ! command -v java >/dev/null; then
+  echo "NOTE: no Java found, so a server will not start yet."
+  echo "      Install it (Debian/Ubuntu: sudo apt install openjdk-21-jre-headless). Minecraft 1.20.5 and newer needs Java 21."
+fi
+if ! command -v setfacl >/dev/null; then
+  echo "NOTE: acl is not installed. Everything works, but new files may need their group fixed;"
+  echo "      running MCSuser again resets that. Install it with: sudo apt install acl"
+fi
+
+# Web login keys. MCSkey and MCSoffbox run straight from the root-owned program folder, so the
+# minecraft user (and any mod) cannot change them. The keys live in /etc/MCS, readable by the
+# $mcuser group but writable only by root: the web service can check a key but not make or
+# revoke one, and neither can a mod or anyone who is only in the $mcuser group.
+printf '#!/bin/sh
+# Added by MCSuser: run the root-owned MCSkey tool (asks for sudo itself).
+exec python3 -I %s/lib/MCS/mcskey.py "$@"
+' "$prefix" > /usr/local/bin/MCSkey
+chmod 755 /usr/local/bin/MCSkey
+# The off-box backup copy: its timer is only enabled by `sudo MCSoffbox set <folder>`.
+printf '#!/bin/sh
+# Added by MCSuser: run the root-owned MCSoffbox tool (asks for sudo itself).
+exec python3 -I %s/lib/MCS/mcsoffbox.py "$@"
+' "$prefix" > /usr/local/bin/MCSoffbox
+chmod 755 /usr/local/bin/MCSoffbox
+install -d -m 750 -o root -g "$mcuser" /etc/MCS
+[[ -f /etc/MCS/keys.json ]] && chown root:"$mcuser" /etc/MCS/keys.json && chmod 640 /etc/MCS/keys.json
+
+# Commands on the PATH. The minecraft user gets the program's bin folder. Your own
+# user gets small root-owned shims that run each tool AS minecraft through sudo,
+# not the scripts themselves: you must never run something minecraft can edit as yourself.
+cat > /etc/profile.d/mcs.sh <<PROFILE
+# Added by MCSuser: MCS tools for the $mcuser user.
+if [ "\$(id -un 2>/dev/null)" = "$mcuser" ]; then
+  case ":\$PATH:" in *:$prefix/bin:*) ;; *) PATH="\$PATH:$prefix/bin" ;; esac
+fi
+PROFILE
+chmod 644 /etc/profile.d/mcs.sh
+for t in MCSimport MCScreate MCSbrowse MCSconf MCSfetch MCSweb MCSbackup MCShelp; do
+  printf '#!/bin/sh\n# Added by MCSuser: runs the MCS tool as the %s user.\nexec sudo -u %s -H %s/bin/%s "$@"\n' "$mcuser" "$mcuser" "$prefix" "$t" > "/usr/local/bin/$t"
+  chmod 755 "/usr/local/bin/$t"
+done
+
+# Fix PERMS on the data folder (the program folder stays root-owned).
+echo -e "\nSetting ${mcuser} folder permissions and adding $SUDO_USER to the $mcuser group."
+chown -hR "$mcuser:$mcuser" "$mchome"
+chmod -R g+rwX,o-rwx "$mchome"
+find "$mchome" -type d -exec chmod g+s {} +
+# The group-write rule above must not loosen the one secret kept here.
+[[ -f "$mchome/.config/MCS/curseforge.key" ]] && chmod 600 "$mchome/.config/MCS/curseforge.key"
+if command -v setfacl >/dev/null; then
+  setfacl -Rdm u::rwX,g:"$mcuser":rwX,o::- "$mchome"
+fi
+usermod -aG "$mcuser" "$SUDO_USER"
+
+echo -e "\nYour shiny new home for Minecraft is done.
+Log out and back in so your new '$mcuser' group membership takes effect.
+Check MCShelp, or INSTALL.md. The MCS program is in $prefix (owned by root) and
+your servers are in $mchome. Toolbox scripts are run as the $mcuser user:
+sudo -iu $mcuser and run MCScreate to create a new instance. MCS<tools> modify an
+existing instance."
+
+echo -e "\nPrefer a browser? Start the web interface (listens on 127.0.0.1 only):
+  sudo systemctl enable --now MCSweb
+then make yourself a login key (shown once, made only here on the server, needs sudo):
+  sudo MCSkey add <your name>
+and open http://localhost:8080. Each person gets their own key: sudo MCSkey list|revoke,
+and sudo MCSkey audit shows who did what. Only root can make or revoke keys."

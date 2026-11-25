@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """MCSoffbox - keep a SEPARATE copy of the backups where the minecraft user and the web page cannot touch it.
 
-Installed by MCSuser as a ROOT-OWNED copy (/usr/local/lib/MCS/mcsoffbox.py, run through
+Runs from the root-owned MCS program folder (/opt/mcs/lib/MCS/mcsoffbox.py, through
 /usr/local/bin/MCSoffbox, which asks for sudo itself). Nothing the minecraft user can write is
 ever run as root from here: mods, helpers and web logins all run as minecraft, so a backup copy
 they can delete is not a safety net.

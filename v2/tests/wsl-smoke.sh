@@ -3,7 +3,7 @@
 # Needs network access. Run from anywhere:  bash tests/wsl-smoke.sh
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-M="python3 -I $HERE/skel/.local/lib/MCS/mcsfetch.py"
+M="python3 -I $HERE/mcs/lib/MCS/mcsfetch.py"
 export MCS_HOME="$(mktemp -d)"
 trap 'rm -rf "$MCS_HOME"' EXIT
 mkdir -p "$MCS_HOME"/instance/{fab,pap}
@@ -36,7 +36,7 @@ check "curseforge refused for paper"      1 env CURSEFORGE_API_KEY=x $M add pap 
 check "curseforge without a key"          1 env -u CURSEFORGE_API_KEY $M add fab curseforge:1
 
 echo "-- download safety"
-python3 -I - "$HERE/skel/.local/lib/MCS" <<'PY'
+python3 -I - "$HERE/mcs/lib/MCS" <<'PY'
 import sys, pathlib, tempfile, os
 sys.path.insert(0, sys.argv[1]); import mcsfetch as m
 d = pathlib.Path(tempfile.mkdtemp()); bad = 0

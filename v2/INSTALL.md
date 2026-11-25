@@ -41,10 +41,11 @@ work but have not been tried. A physical machine (Debian) is the next thing to t
    ./MCSuser
    ```
 
-   It creates a `minecraft` system user, puts everything under `/opt/minecraft`, installs the systemd
+   It creates a `minecraft` system user, installs the MCS program in `/opt/mcs` (owned by root) and
+   creates `/opt/minecraft` (owned by `minecraft`) for your servers and backups. It installs the systemd
    units, the polkit rule and the `MCS...` commands, turns on the backup timer, and adds you to the
-   `minecraft` group. Read it first if you like; it is commented. If the `minecraft` user already
-   exists it asks whether to reinstall the MCS files (yes when updating; your servers are not touched).
+   `minecraft` group. Read it first if you like; it is commented. It is safe to run again: it
+   replaces the program and leaves your servers and backups alone.
 
 3. **Log out and back in** so your new group membership takes effect.
 
@@ -108,10 +109,11 @@ journalctl -u MCS@<server> -f      # the console
 
 | Path | What |
 | --- | --- |
+| `/opt/mcs` | the MCS program: commands, web page, tools (owned by root; nothing the `minecraft` user runs can change it) |
 | `/opt/minecraft/instance/<server>` | each server's files |
 | `/opt/minecraft/backups/instance` | the backups |
+| `/opt/minecraft/.config/MCS` | MCS settings (and the CurseForge key, if you add one) |
 | `/etc/MCS` | login keys and the off-box settings (root-owned) |
-| `/usr/local/lib/MCS` | the root-owned copies of `MCSkey` and `MCSoffbox` |
 
 ## Who can do what (so you know what to trust)
 
@@ -120,16 +122,19 @@ journalctl -u MCS@<server> -f      # the console
 - Mods and plugins run as the `minecraft` user, and so does the web page. Anything they can read or
   delete on this machine, a mod can too, including the on-box backups and the CurseForge key if you
   add one. That is the reason for the separate copy, and for only installing mods you trust.
+- The MCS program in `/opt/mcs` is owned by root. A mod, a helper in the `minecraft` group or the web page
+  can read and run it but cannot change it, so a mod cannot rewrite the web page's code or the key tool.
 
 ## Updating
 
-Pull the new files, run `./MCSuser` again, answer `y` to reinstall the MCS files. Servers and
-backups are left alone.
+Pull the new files and run `./MCSuser` again. It replaces `/opt/mcs`; servers and backups are left
+alone. An install from before the program and data were separated (the program used to sit inside
+`/opt/minecraft`) is cleaned up automatically.
 
 ## There is no uninstaller yet
 
-Removing MCS means stopping the `MCS@*` units, deleting `/opt/minecraft`, `/etc/MCS`,
-`/usr/local/lib/MCS`, the `MCS*` files in `/usr/local/bin` and `/etc/systemd/system`, and
+Removing MCS means stopping the `MCS@*` units, deleting `/opt/mcs`, `/opt/minecraft`, `/etc/MCS`,
+the `MCS*` files in `/usr/local/bin` and `/etc/systemd/system`, and
 `/etc/polkit-1/rules.d/50-mcs.rules`. The `teardown` step in `tests/wsl-full.sh` does exactly that, and
 **deletes the servers**, so only use it on a test machine.
 

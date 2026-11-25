@@ -5,7 +5,7 @@ Description=MCS off-box backup copy
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 -I /usr/local/lib/MCS/mcsoffbox.py run
+ExecStart=/usr/bin/python3 -I /opt/mcs/lib/MCS/mcsoffbox.py run
 Nice=10
 IOSchedulingClass=idle
 TimeoutStartSec=6h

@@ -8,15 +8,16 @@ EULA="$LIB/eula.txt"
 CHOOSE="What would you like your server to be called? "
 ###############################################################################
 ### EULA check ###
-if [[ ! -f "$LIB/EULA.token" ]]; then
+TOKEN="$mcsH/.config/MCS/EULA.token"  # in the data folder: the program folder is read-only
+if [[ ! -f "$TOKEN" ]]; then
   printf "%s" "$(<"$EULA")" && echo -e "\nYou will only have to do this once."
   read -rp "Do you agree? true or false: " -n 1
   echo
   if [[ ! $REPLY =~ ^[Tt]$ ]]; then
     echo "You must agree to the eula to run a server." && exit 1
   fi
-  sed -i -e "s/eula=false/eula=true/g" "$EULA"
-  echo "true" > "$LIB/EULA.token"
+  mkdir -p "$(dirname "$TOKEN")"
+  echo "true" > "$TOKEN"
 fi
 ### ask for the name of the server <instance> if it wasn't named on start ###
 chooser
@@ -30,8 +31,8 @@ while ! valid_name "$INSTANCE" || in_list "$INSTANCE"; do
 done
 ### create <instance> folder ###
 mkdir -- "$mcsHI/$INSTANCE" || exit 1
-# The token records your agreement; the template eula.txt can be reset to
-# false by reinstalling the MCS files, so always write the instance's copy true.
+# The token records your agreement. The template eula.txt (in the read-only program
+# folder) stays false, so always write the instance's own copy true.
 sed 's/^eula=false/eula=true/' "$EULA" > "$mcsHI/$INSTANCE/eula.txt"
 ### copy jar file and mods/configs. ###
 echo -e "\nCopy your jar into the import folder. If you have mods put them \n\
@@ -44,7 +45,7 @@ before initialization/world gen."
 conf
 ### game port and first player ###
 fetch="$(cd "$LIB/../../bin" && pwd)/MCSfetch"
-suggest="$("$fetch" port)"
+suggest="$("$fetch" port --skip "$INSTANCE")"
 echo -e "
 Each server needs its own game port. A port other than 25565 cuts down random scanner 
 traffic, but it is not security."
@@ -63,7 +64,7 @@ done
 ### done ###
 echo -e "\nYour Minecraft server $INSTANCE is ready. \n\
 Use 'systemctl start MCS@$INSTANCE' to run it, and 'systemctl stop MCS@$INSTANCE' to stop it. \n\
-See README in the minecraft home folder for details"
+See MCShelp for details"
 read -rp "Would you like to browse $INSTANCE ? Y or n: " -n 1
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then browse; fi

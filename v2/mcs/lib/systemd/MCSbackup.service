@@ -12,7 +12,7 @@ UMask=0007
 Environment=PYTHONDONTWRITEBYTECODE=1
 # Warning countdown + stop + copy + start can take a while on a big world.
 TimeoutStartSec=3h
-ExecStart=/usr/bin/python3 -I /opt/minecraft/.local/lib/MCS/mcsbackup.py run-due
+ExecStart=/usr/bin/python3 -I /opt/mcs/lib/MCS/mcsbackup.py run-due
 
 NoNewPrivileges=true
 ProtectSystem=strict

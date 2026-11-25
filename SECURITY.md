@@ -44,8 +44,11 @@ That line held.
   (`NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`); the one polkit rule lets them
   manage only `MCS@*` units. A low-privilege SSH user in the `minecraft` group has no sudo and no path to
   root.
-- **Root tools:** `MCSkey` and `MCSoffbox` are root-owned copies that never run anything a lower-privileged
-  user can write. `MCSoffbox` opens files without following links, checks what it wrote, and refuses a
+- **The program is root-owned:** MCS is installed in `/opt/mcs`, separate from your servers and backups in
+  `/opt/minecraft`. The `minecraft` user, and so any mod, can read and run the program but cannot create,
+  edit or rename anything in it, which was tested directly. A mod cannot rewrite the web page's code.
+- **Root tools:** `MCSkey` and `MCSoffbox` run from that root-owned folder and never run anything a
+  lower-privileged user can write. `MCSoffbox` opens files without following links, checks what it wrote, and refuses a
   destination the `minecraft` user can write.
 - **The record:** every change made through the web page is written to the journal by root, under the
   key's name, and a helper or a mod cannot forge or erase it (`sudo MCSkey audit`).

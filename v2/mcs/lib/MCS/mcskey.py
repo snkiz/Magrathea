@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """MCSkey - make, list and revoke MCSweb login keys, and read the audit log.
 
-Installed by MCSuser as a ROOT-OWNED copy (/usr/local/lib/MCS/mcskey.py, run
-through /usr/local/bin/MCSkey). It is deliberately not part of the files the
-minecraft user can write: mods run as that user, and anything it can edit must
-never be able to hand out web logins.
+Runs from the root-owned MCS program folder (/opt/mcs/lib/MCS/mcskey.py, through
+/usr/local/bin/MCSkey). That folder is deliberately not writable by the minecraft
+user: mods run as that user, and anything it can edit must never be able to hand
+out web logins.
 
 The keys live in /etc/MCS/keys.json, owned by root and only READABLE by the
 minecraft group. The web service can check a key but cannot add, change or

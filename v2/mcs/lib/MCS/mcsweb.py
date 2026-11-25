@@ -62,7 +62,7 @@ OLD_TOKEN_FILE = CONF_DIR / "web.token"  # pre-keys single token; deleted on sta
 # the same user) can check a key but cannot add or revoke one. Managed by MCSkey (sudo).
 KEYS_FILE = Path("/etc/MCS/keys.json")
 CF_KEY_FILE = CONF_DIR / "curseforge.key"
-EULA_TOKEN = LIB / "EULA.token"
+EULA_TOKEN = CONF_DIR / "EULA.token"  # in the data folder: the program folder is read-only
 ORIG_ERR = sys.stderr
 
 SESSION_SECONDS = 12 * 3600

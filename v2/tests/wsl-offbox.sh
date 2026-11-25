@@ -8,7 +8,7 @@ B=http://localhost:8080
 J="$(mktemp)"
 SRC=/opt/minecraft/backups/instance
 DEST=/root/ob-dest
-LIBDIR=/opt/minecraft/.local/lib/MCS
+LIBDIR=/opt/mcs/lib/MCS
 fail=0
 pass () { echo "PASS  $1"; }
 bad () { echo "FAIL  $1"; [[ -n "${2:-}" ]] && echo "        $2"; fail=1; }

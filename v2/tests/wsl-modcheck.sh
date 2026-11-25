@@ -5,7 +5,7 @@
 set -u
 B=http://localhost:8080
 J="$(mktemp)"
-LIBDIR=/opt/minecraft/.local/lib/MCS
+LIBDIR=/opt/mcs/lib/MCS
 T=$(mktemp -d)
 fail=0
 pass () { echo "PASS  $1"; }
