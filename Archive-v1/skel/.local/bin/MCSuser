@@ -1,0 +1,47 @@
+#!/bin/bash
+### Var
+ mcuser=minecraft #DO NOT CHANGE! FOR TESTING. 
+### There are serveral other things that are hard coded to /opt/minecraft ###
+ GREET="This script creates a system user and group called ${mcuser}. \n
+Creates a directory owned by ${mcuser} where your server files live and adds \n 
+some tools. It installs a systemd service to control your servers. It only does \n
+this if nessary or requested, so it safe to run on an existing install. \n
+It always sets file permissions So you can run this if you have that issue."
+#############################################################################
+#Sudo check
+ if ! [ $(id -u) = 0 ]; then
+    echo -e "Hello ${USER}, you are not root. We will need that. \n
+Here, let me sudo that for you... or press Ctl+C to exit." >&2; sudo "$0" "$@"; exit 1
+    else echo -e "\n${SUDO_USER}, You are ${USER}. \n${GREET}"; fi && sleep 2
+#Check if user $mcuser exisits and add it if not.
+ echo -e "\nchecking for ${mcuser} user..." && sleep 1
+ if ! id -u $mcuser > /dev/null 2>&1; then
+    echo -e "User ${mcuser} does not exist. Creating... \n"
+    useradd -mrUd /opt/$mcuser -s /bin/bash $mcuser && cp -rv skel/. /opt/$mcuser
+ else   
+    echo "${mcuser} user found. Install MCS (skel) anyway? Yes if this is the first time."
+    read -p ".local/lib/MCS/eula.txt will be over written y or n: " -n 1 -r
+    if [[ $REPLY =~ ^[Yy]$ ]]; then 
+    cp -rv skel/. /opt/$mcuser; fi
+ fi && sleep 1
+#Check if MCS@.service exisits. Add MCS service template and socket to 
+#/etc/systemd/system/ if it does not.
+ echo -e "\nchecking for MCS services..." && sleep 1
+ if [ ! -f /etc/systemd/system/MCS@.service ]; then
+    echo -e "File not found! Installing... \n"
+    ln -srv /opt/$mcuser/.local/lib/systemd/MCS@.service /etc/systemd/system/.
+    ln -srv /opt/$mcuser/.local/lib/systemd/MCS@.socket /etc/systemd/system/.; else
+    echo -e "MCS services found, skipping."; fi && sleep 1
+#Fix PERMS
+ echo -e "\n
+Setting ${mcuser} folder permissions and adding $SUDO_USER to the $mcuser \ngroup." && sleep 1
+ chown -hR $mcuser:$mcuser /opt/$mcuser && echo && chmod -R g+rws /opt/$mcuser
+ setfacl -Rdm u::rwX,g:$mcuser:rwX,o::- /opt/$mcuser && usermod -aG $mcuser $SUDO_USER && sleep 1
+# All Done!
+ echo -e "\nYour shiny new home for MineCraft is done. \n
+Check MCShelp or the readme in the minecraft home folder. Toolbox scripts, \n
+are run as the $mcuser. So xhost +si:localuser:minecraft to give $mcuser \n
+GUI access. Then run sudo su -u minecraft -s /bin/bash and, \n
+./~/toolbox/MCScreate to create a new instance. MCS<tools> to modify an \n
+existing instance." && exit 0
+

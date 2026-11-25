@@ -1,0 +1,16 @@
+#!/bin/bash -x
+### Libary directory
+LIB="$(cd "$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/../lib/MCS" && pwd)"
+source $LIB/MCS.lib
+### Var
+CHOOSE="Choose the instance you want to import to. Ctl-C to exit "
+#############################################################################
+ chooser ### choose instance ### 
+ if [[ " ${LIST[*]} " =~ [[:space:]]${INSTANCE}[[:space:]] ]]; then
+   echo -e "\nPut your files to be imported here. You can infact, \n
+use this to import an entire instance.. \n" && sleep 2
+   import; else ### open import folder ###  
+   echo "If you wish to create a new instace use MCScreate." && exit 1; fi
+
+ exit 0
+ 

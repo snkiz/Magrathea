@@ -1,0 +1,53 @@
+#!/bin/bash
+#### MCS Functions ####
+#######################
+### VAR
+INSTANCE=$1
+SDIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+mcsH="$(cd "$SDIR/../../." && pwd)"
+mcsHI="$mcsH/instance"
+LIST=$(ls $mcsHI)
+fileMAN=$(xdg-mime query default inode/directory | sed 's/.desktop//g')
+xhWARN="Reminder, xhost +si:localuser:minecraft Must be enabled on YOUR profile." 
+#############################################################################
+chooser () {  ### Get input.
+ while [ -z "$INSTANCE" ] ; do
+   echo -e "~~MCS Instance Chooser~~\n"
+   printf '%s\n' "${LIST[@]}" && echo && read -p "$CHOOSE" INSTANCE
+ done
+}
+import () {  ### Open import dir, and copy whatever is put there.
+ echo -e "$xhWARN"
+ echo -e "Close file manager when done copying files. \n
+WARNING-This folder is Power Washed on completion." && sleep 2
+ $fileMAN $mcsH/import
+ cp -rv $mcsH/import/* $mcsHI/$INSTANCE
+ rm -rfv $mcsH/import/* && mkdir -pv $mcsH/import/mods $mcsH/import/config
+}
+conf () {  ### service and properties files
+ SERVER=$(cd $mcsHI/$INSTANCE/ && find *.jar)  ## This assumes There is Only One .jar in the root instance folder.
+ if [ ! -f $mcsHI/$INSTANCE/server.properties ]; then
+    echo -e "\nserver.properties not found! Installing..."
+    cp -rv $LIB/server.properties $mcsHI/$INSTANCE/server.properties
+    sed -i "s/level-name=NULL/level-name="$INSTANCE"/g" "$mcsHI/$INSTANCE/server.properties"
+    sed -i "s/motd=A minecraft server/motd="Welcome to $INSTANCE"/g" "$mcsHI/$INSTANCE/server.properties"
+ fi && sleep 1
+ if [ ! -f $mcsHI/$INSTANCE/service.conf ]; then
+    echo -e "\nservice.conf not found! Installing...\n$SERVER\n"
+    cp -rv $LIB/service.conf $mcsHI/$INSTANCE/service.conf
+    sed -i "s/SERVER=NULL/SERVER="$SERVER"/g" "$mcsHI/$INSTANCE/service.conf" && sleep 1
+ echo && read -p "Would you like to edit the server.properties? Y or n: " -n 1 -r
+ if [[ $REPLY =~ ^[Yy]$ ]]; then 
+   nano $mcsHI/$INSTANCE/server.properties; fi
+ echo -e "\nThe service.conf contains your jar file, java version, ram alcation, \n
+java arguments and a shudowm message with configuable timer. \n"
+ read -p "Would you like to edit the service.conf? Y or n: " -n 1 -r
+ if [[ $REPLY =~ ^[Yy]$ ]]; then 
+   nano $mcsHI/$INSTANCE/service.conf; fi
+}
+browse () {  ### Open INSTANCE or home folder.
+ echo -e "$xhWARN" 
+ echo "This is running as the minecraft user." && sleep 2
+    $fileMAN $mcsHI/$INSTANCE
+}
+

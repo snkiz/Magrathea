@@ -1,0 +1,13 @@
+#!/bin/bash
+### Libary directory
+LIB="$(cd "$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/../lib/MCS" && pwd)"
+source $LIB/MCS.lib
+### Var
+CHOOSE="Choose the instance you wish to configure. or Ctl-C to exit: "
+#############################################################################
+ chooser ### choose instance
+ if [[ " ${LIST[*]} " =~ [[:space:]]${INSTANCE}[[:space:]] ]]; then
+   conf; else  ### open <instance> service.conf ###
+   echo "If you wish to create a new instace use MCScreate." && exit 1; fi
+
+ exit 0

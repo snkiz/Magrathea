@@ -1,0 +1,7 @@
+[Unit]
+PartOf=MCS@.service
+Accept=yes
+
+[Socket]
+ListenFIFO=%t/MCS@%i.stdin
+

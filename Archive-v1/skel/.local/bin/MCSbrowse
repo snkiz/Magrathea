@@ -1,0 +1,16 @@
+#!/bin/bash
+### Libary directory
+LIB="$(cd "$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/../lib/MCS" && pwd)"
+source $LIB/MCS.lib
+### Var
+CHOOSE="Choose an instance, you may browse the MC user's home directory by typing none. Or Ctl-C to exit: "
+#############################################################################
+ chooser  ### choose instance ###
+ if [[ "$INSTANCE" == "none" ]]; then
+   $fileMAN $mcsH; else
+ if [[ " ${LIST[*]} " =~ [[:space:]]${INSTANCE}[[:space:]] ]]; then
+   browse; else  ### open file manager <instance> ###
+   echo "If you wish to create a new instace use MCScreate." && exit 1; fi
+ fi
+
+ exit 0

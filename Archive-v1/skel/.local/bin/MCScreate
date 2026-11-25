@@ -1,0 +1,48 @@
+#!/bin/bash
+### libary directory ###
+ LIB="$(cd "$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/../lib/MCS" && pwd)"
+ source $LIB/MCS.lib
+### Var ###
+ EULA="$LIB/eula.txt"
+ CHOOSE="What would you like your server to be called? "
+###############################################################################
+### EULA check ###
+ if [ ! -f $LIB/EULA.token ]; then
+   printf "%s" "$(<$EULA)" && echo -e "\nYou will only have to do this once."
+   read -p "Do you agree? true or false: " -n 1 -r
+   echo
+   if [[ ! $REPLY =~ ^[Tt]$ ]]; then
+      echo "You must agree to the eula to run a server." && exit 1; else
+      sed -i -e "s/eula=false/eula=true/g" "$EULA"
+      touch $LIB/EULA.token && echo "true" > $LIB/EULA.token; fi
+ fi
+### ask for the name of the server <instance> if it wasn't named on start? ###
+ chooser
+ while $(printf '%s\n' "${LIST[@]}" | grep -F -x -q -- "${INSTANCE}"); do
+   echo -e "~~MCS Instance Chooser~~\n"
+   echo -e "$INSTANCE already exists. Use MCSimport MCSconf and MCSborwse to \n
+edit an existing instance."
+   read -p " $CHOOSE or Ctl-C to exit: " INSTANCE
+ done
+### create <instance> folder ### 
+ mkdir $mcsHI/$INSTANCE
+ cp -rv $EULA "$mcsHI/$INSTANCE/eula.txt"
+### copy jar file and mods/configs. ###
+ echo -e "\nCopy your jar into this -import- folder. If you have mods put them \n
+into the mods folder, and if you've configiured them put the configs in the config \n
+folder."
+ import
+### install server.properties and service.conf ###
+ echo -e "\nExperimental options must be enabebled in server.properties \n
+before initazation/world gen."  
+ conf
+### open <instance> folder. ###
+ echo -e "\nYour Minecraft server $INSTANCE is ready. \n
+Use systemctl start start/stop MCS@$INSTANCE to run it. \n
+See README in the minecraft home folder for details"
+ read -p "Would you like to browse $INSTANCE ? Y or n: " -n 1 -r
+ if [[ $REPLY =~ ^[Yy]$ ]]; then 
+   browse ; fi 
+
+ exit 0
+ 

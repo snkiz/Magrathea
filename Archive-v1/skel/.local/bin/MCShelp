@@ -1,0 +1,11 @@
+#!/bin/bash
+### Libary directory
+LIB="$(cd "$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/../lib/MCS" && pwd)"
+### Var
+HELP="$LIB/help.txt"
+###############################################################################
+printf "%s" "$(<$HELP)"
+echo
+
+exit 0
+

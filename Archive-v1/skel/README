@@ -1,0 +1,98 @@
+### README ###
+## Sat 31 Aug 2024 04:11:32 AM EDT
+## Author: snkiz
+## License: Creative Commons. 
+## It's just some bash I cobbled together from bits of stack exchange.
+
+## The latest Official Mincraft server jar can be found here;
+## *** https://www.minecraft.net/en-us/download/server ***
+
+This packege is a number of scripts to help you set up a basic secure method of 
+running and managing multipule minecraft servers with nothing more than systemd.
+Be they vanilla or modded, you supply the jar. Some things you will run as your
+Linux user and some things are run as the minecraft Linux user. Things in 
+<these brakets> are varibles, do not include the brackets. 
+**NOTES** Are very IMPORTANT! Read them.
+Some of this is run with SUDO. Do Not just trust me and run it. Look it over,
+it all has comments. This is the longest document in the buch.
+
+These comands are all run as your user. ( <yourusername>@<hostname> )
+  - MCSuser
+  - systemctrl <start/stop/staus> MCS@<instance>
+  - systemctrl <enable/disable> MCS@<instance>   ## Auto start. Run as sudo.
+  - journalctl -u MCS@<instance> -f              ## Minecraft console log
+  - echo "<comand>" > /run/MCS@<instance>.stdin  ## Send the console commands
+  
+./MCSuser 
+  Creates a system user and group called minecraft. Creates a directory
+  owned by minecraft where your server files live and adds some tools. 
+  Installs a systemd service to control your servers. 
+  It only does those if nessary or requested. So it safe to run on an existing 
+  install. It always sets file permissions. So you can re-run this if you have
+  issues with those.
+ 
+To run comands as the minecraft user you will need to run:
+  - xhost +si:localuser:minecraft     ## **NOTES** To give minecraft user GUI access.
+  - sudo su -u minecraft -s /bin/bash ## log in as the minecraft user.
+  
+  
+Once logged in ( you will see your prompt change from <yourusername>@<hostname> 
+to minecraft@<hostname>. ) Then you can change directory ( cd ~/toolbox && ls )
+and run any of the MCS<tools>. **NOTES** Except MCSuser.
+
+./MCScreate
+  checks that you have agreed to mojang's eula and asks you to name your server.
+  Then creates a new instance folder, and copies some files. It then runs the other
+  tools in the following order. **NOTES** If you are not running an xserver,
+  Browse and Import will not work properly. You will have to copy your jar 
+  manually, and run MCSconf to at least fill in the feilds marked NULL.
+
+./MCSimport
+  Opens the import directory in a file browser so you may copy your jar file and
+  any mods and configs you may have. It then copies them to the instance and cleans
+  the import directory.
+  
+./MCSconf
+  Copies the service.conf and server.properties if they don't exist and prompts
+  you to edit those files. The service.conf is the configuration for the 
+  systemd service. server.properties is the main minecraft configuation file.
+  **NOTES** Edit this before the server is run for the first time if you want a
+  custom seed or experimental features.
+  
+./MCSbrowse
+  Just opens the file browser either in the the <instance> folder or the minecraft
+  home folder. **NOTES** If using wayland ( pkexec -u minecraft <filebrowser> ) 
+  should be used instead. Your milage may vary.
+  
+./MCShelp
+  A more concise version of this file.
+  
+###############################################################################
+ 
+Special note:
+ A kind of hacky workaround to managing your mods is to use prism to do it for you.
+ https://flathub.org/apps/org.prismlauncher.PrismLauncher
+ Prism has dependency checking, and with this method you can test the mod load out
+ in a local prism client to make sure it all works. Prism has rudimenty server 
+ support, but this won't be using that. 
+ *Be aware prism is meant for you to run a client, this is not supported in
+ any way. Some mods are not compible with servers. You must read the
+ discriptions! And ensure your mods are meant for servers.
+
+ So, what you do is use flatseal https://flathub.org/apps/com.github.tchx84.Flatseal
+ to give prism access to your instance folder. Then create a prism instance 
+ with the matching version ( mcversion and jar, vanilla, fabic, modpak, etc. )
+ Now click the folder button for that instance. If you haven't put any mods on
+ your server yet, copy the mod and config folders to the server instance, then
+ delete them from the prism folder.
+ Open a terminal in that folder and use:
+ - ln -dsv /opt/minecraft/instance/<instance>/config config
+ - ln -dsv /opt/minecraft/instance/<instance>/mods mods
+ Do the same for any file or folder that a mod drops in the root minecraft
+ folder. 
+ Last you restart prism. Go to your instance and click the edit button, click
+ the mods button and update.
+ 
+ You are good to go. Just keep in mind prism can not update your server jar.
+ And again, this is a hack.
+

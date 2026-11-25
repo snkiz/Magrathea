@@ -1,0 +1,46 @@
+## MineCraft Server managment systmed service. Screen Not Required!
+[Unit]
+# Can be anything you like, %i is the server folder name. 
+Description=%i A Mincraft server  
+After=network.target
+
+[Service]
+Type=exec
+ProtectHome=true
+ProtectSystem=full
+PrivateDevices=true
+NoNewPrivileges=true
+PrivateTmp=true
+
+User=minecraft
+Group=minecraft
+
+InaccessibleDirectories=/root /sys /srv -/var /media -/lost+found
+ReadWriteDirectories=/opt/minecraft/instance/%i
+WorkingDirectory=/opt/minecraft/instance/%i
+EnvironmentFile=/opt/minecraft/instance/%i/service.conf
+
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=60s
+StartLimitBurst=2
+SuccessExitStatus=0 1
+
+Sockets=MCS@.socket
+StandardInput=socket
+StandardOutput=journal         
+StandardError=journal
+# Short name for the log, %i is the server folder name
+SyslogIdentifier=MCS-%i
+
+ExecStop=/bin/sh -c '\
+echo "say ${SIGNOFF}" > /run/MCS@%i.stdin && sleep ${TIMER}'
+ExecStop=/bin/sh -c '\
+echo "say ${SAVEnX}." > /run/MCS@%i.stdin && sleep 2 \
+&& echo "save-all" > /run/MCS@%i.stdin'
+
+ExecStart=java $RAM $ARGS -jar ${SERVER} nogui
+
+[Install]
+WantedBy=multi-user.target
+
