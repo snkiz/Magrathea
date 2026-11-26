@@ -94,11 +94,25 @@ throwaway user of its own, and systemd hands it the keys from a root-only folder
 mods, never see them. The web page and MCSfetch tell it what to ask over a local socket; it makes the request and
 hands back the answer, never the key.
 
+Each person gets their own web login key. Only a hash of it is kept, it is shown once when it is made, and only
+root can make or revoke one (`sudo MCSkey add|revoke <name>`): the web page can check a key but cannot change the
+key file. Revoking a key ends its sessions at once, and too many wrong keys from one address locks it out for ten
+minutes.
+
 [SECURITY.md](SECURITY.md) says what was reviewed, what is still open, and how to report a problem.
 
 ## License
 
 AGPL-3.0, see [LICENSE](LICENSE). The bundled Shantell Sans font has its own license, see
 [NOTICE.txt](v2/mcs/lib/MCS/web/fonts/NOTICE.txt).
+
+## Forks
+
+You are free to fork Magrathea under the AGPL-3.0. A fork does not get the project's keys or art:
+
+- The CurseForge key in `v2/curseforge-project` was issued to this project. Remove it, or put your own in its
+  place.
+- The art is not under the AGPL and does not come with a fork.
+- Give your fork its own name, and say that it is not Magrathea.
 
 Magrathea is not affiliated with or endorsed by Mojang, Microsoft, Modrinth or CurseForge.
