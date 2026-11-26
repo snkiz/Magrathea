@@ -38,17 +38,6 @@ else
 fi
 mkdir -p "$mchome"/{instance,import/mods,import/config,backups/mods,backups/PlayerData,backups/instance,.config/MCS}
 
-# Move a pre-split install out of the way: the program used to live inside the data folder,
-# where the minecraft user could change it. Keep the one thing that was real data.
-if [[ -d "$mchome/.local" ]]; then
-  echo "Found the old layout (program inside $mchome). Cleaning it up."
-  [[ -f "$mchome/.local/lib/MCS/EULA.token" && ! -f "$mchome/.config/MCS/EULA.token" ]] \
-    && cp "$mchome/.local/lib/MCS/EULA.token" "$mchome/.config/MCS/EULA.token"
-  rm -rf "$mchome/.local" "$mchome/toolbox"
-fi
-rm -f /usr/local/lib/MCS/mcskey.py /usr/local/lib/MCS/mcsoffbox.py
-rmdir /usr/local/lib/MCS 2>/dev/null || true
-
 # Install the program as root-owned files, replacing the old copy in one step.
 echo -e "\ninstalling the MCS program into ${prefix} (owned by root)..."
 rm -rf "${prefix:?}.new"
@@ -154,11 +143,6 @@ echo -e "\nSetting ${mcuser} folder permissions and adding $SUDO_USER to the $mc
 chown -hR "$mcuser:$mcuser" "$mchome"
 chmod -R g+rwX,o-rwx "$mchome"
 find "$mchome" -type d -exec chmod g+s {} +
-# The group-write rule above must not loosen the one secret kept here.
-if [[ -f "$mchome/.config/MCS/curseforge.key" ]]; then
-  chmod 600 "$mchome/.config/MCS/curseforge.key"
-  echo "NOTE: $mchome/.config/MCS/curseforge.key is no longer used. Mods can read it, so delete it."
-fi
 if command -v setfacl >/dev/null; then
   setfacl -Rdm u::rwX,g:"$mcuser":rwX,o::- "$mchome"
 fi

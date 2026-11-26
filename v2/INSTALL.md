@@ -139,9 +139,7 @@ journalctl -u MCS@<server> -f      # the console
 
 Pull the new files and run `./MCSuser` again. It replaces `/opt/mcs`; servers and backups are left
 alone. If the web page is running it is restarted so it uses the new version, which stops any job
-running in it (a download, for example) and signs everyone out; Minecraft servers keep running. An
-install from before the program and data were separated (the program used to sit inside
-`/opt/minecraft`) is cleaned up automatically.
+running in it (a download, for example) and signs everyone out; Minecraft servers keep running.
 
 ## There is no uninstaller yet
 

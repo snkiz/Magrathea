@@ -80,7 +80,7 @@ teardown_stage () {
   systemctl daemon-reload
   [[ -n "${SUDO_USER:-}" ]] && gpasswd -d "$SUDO_USER" minecraft 2>&1 | tail -n 1
   userdel -r minecraft 2>&1 | tail -n 2; getent group minecraft >/dev/null && groupdel minecraft
-  rm -rf /opt/mcs /opt/minecraft /etc/MCS /usr/local/lib/MCS
+  rm -rf /opt/mcs /opt/minecraft /etc/MCS
   id minecraft 2>&1 | head -n 1
 }
 
