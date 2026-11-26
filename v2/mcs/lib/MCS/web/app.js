@@ -75,6 +75,7 @@ async function boot() {
 
 /* Said once, in plain words, on every page. */
 const footer = () => h("footer", { class: "foot" },
+  h("p", {}, h("strong", {}, "NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.")),
   h("p", {}, "MCS is an independent community tool. It is not affiliated with or endorsed by Mojang, Microsoft, Modrinth or CurseForge. Minecraft is a trademark of Mojang Synergies AB."),
   h("p", {}, "Typeface: Shantell Sans, SIL Open Font License."));
 

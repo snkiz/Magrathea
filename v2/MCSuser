@@ -9,7 +9,10 @@ mcuser=minecraft
 mchome="/opt/$mcuser"
 prefix="/opt/mcs"
 SKEL="$(cd "$(dirname "$(readlink -f "$0")")/mcs" && pwd)"
-GREET="This script creates a system user and group called ${mcuser}.
+GREET="NOT AN OFFICIAL MINECRAFT PRODUCT.
+NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+
+This script creates a system user and group called ${mcuser}.
 It installs the MCS program in ${prefix} (owned by root) and creates ${mchome},
 owned by ${mcuser}, where your server files live. It installs a systemd service
 to control your servers. It is safe to run on an existing install: your servers
@@ -87,7 +90,9 @@ fi
 # Java and acl are not needed to install, but a server will not start without Java, so say so now.
 if ! compgen -G "/usr/lib/jvm/*/bin/java" >/dev/null && ! command -v java >/dev/null; then
   echo "NOTE: no Java found, so a server will not start yet."
-  echo "      Install it (Debian/Ubuntu: sudo apt install openjdk-21-jre-headless). Minecraft 1.20.5 and newer needs Java 21."
+  echo "      Minecraft 26.1 and newer needs Java 25; 1.20.5 to 1.21.x needs Java 21."
+  echo "      Debian/Ubuntu: sudo apt install openjdk-25-jre-headless   (or openjdk-21-jre-headless)"
+  echo "      Not every release packages every Java. INSTALL.md lists the older versions."
 fi
 if ! command -v setfacl >/dev/null; then
   echo "NOTE: acl is not installed. Everything works, but new files may need their group fixed;"

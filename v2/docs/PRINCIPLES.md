@@ -10,7 +10,7 @@
 6. Simple on purpose. One server user, ordinary files, no Docker-style images: you can see how it works.
    That has limits, and the docs say what they are.
 7. Meant to be learned from. Magrathea lets you see how Linux, permissions, web pages and small programs
-   work, so you can fix it. That teaching is the point, and threre is no charge.
+   work, so you can fix it. The teaching is the point, and there is no charge.
 
 ## Guiding rules
 - Magrathea is a PACKAGE MANAGER, not a loader/launcher. It installs and manages; it does not interfere
