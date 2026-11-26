@@ -103,6 +103,12 @@ printf '#!/bin/sh
 exec python3 -I %s/lib/MCS/mcskey.py "$@"
 ' "$prefix" > /usr/local/bin/MCSkey
 chmod 755 /usr/local/bin/MCSkey
+# The owner's switch for RCON and the management server (asks for sudo itself).
+printf '#!/bin/sh
+# Added by MCSuser: run the root-owned MCSrcon tool (asks for sudo itself).
+exec python3 -I %s/lib/MCS/mcsrcon.py "$@"
+' "$prefix" > /usr/local/bin/MCSrcon
+chmod 755 /usr/local/bin/MCSrcon
 # The off-box backup copy: its timer is only enabled by `sudo MCSoffbox set <folder>`.
 printf '#!/bin/sh
 # Added by MCSuser: run the root-owned MCSoffbox tool (asks for sudo itself).
@@ -111,6 +117,7 @@ exec python3 -I %s/lib/MCS/mcsoffbox.py "$@"
 chmod 755 /usr/local/bin/MCSoffbox
 install -d -m 750 -o root -g "$mcuser" /etc/MCS
 [[ -f /etc/MCS/keys.json ]] && chown root:"$mcuser" /etc/MCS/keys.json && chmod 640 /etc/MCS/keys.json
+[[ -f /etc/MCS/remote.json ]] && chown root:"$mcuser" /etc/MCS/remote.json && chmod 640 /etc/MCS/remote.json
 
 # Commands on the PATH. The minecraft user gets the program's bin folder. Your own
 # user gets small root-owned shims that run each tool AS minecraft through sudo,

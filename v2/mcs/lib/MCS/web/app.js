@@ -348,13 +348,14 @@ async function tabSettings(body, s) {
     const ia = PROP_TOP.indexOf(a.key), ib = PROP_TOP.indexOf(b.key);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);  // stable: the rest keep their order
   });
-  for (const { key, value } of ordered) {
+  for (const { key, value, locked } of ordered) {
     let el;
-    if (PROP_SELECT[key]) el = h("select", {}, PROP_SELECT[key].map((o) => h("option", { value: o, selected: o === value }, o)));
+    if (locked) el = h("input", { type: "text", value, disabled: true });
+    else if (PROP_SELECT[key]) el = h("select", {}, PROP_SELECT[key].map((o) => h("option", { value: o, selected: o === value }, o)));
     else if (value === "true" || value === "false") el = h("select", {}, ["true", "false"].map((o) => h("option", { value: o, selected: o === value }, o)));
     else el = h("input", { type: /^\d+$/.test(value) ? "number" : "text", value });
     el.dataset.orig = value; el.id = "p-" + key; inputs[key] = el;
-    grid.append(h("div", { class: "field", "data-key": key }, h("label", { for: "p-" + key }, key), el, PROP_HINT[key] ? h("div", { class: "muted small" }, PROP_HINT[key]) : null));
+    grid.append(h("div", { class: "field", "data-key": key }, h("label", { for: "p-" + key }, key), el, locked ? h("div", { class: "muted small" }, "Set on the server with MCSrcon.") : PROP_HINT[key] ? h("div", { class: "muted small" }, PROP_HINT[key]) : null));
   }
   filter.addEventListener("input", () => {
     const q = filter.value.toLowerCase();

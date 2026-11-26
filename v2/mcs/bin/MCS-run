@@ -21,6 +21,12 @@ if [[ "$(grep -s '^online-mode=' server.properties | cut -d= -f2 | tr -d '[:spac
   echo "MCS WARNING: online-mode=false. Players are not checked against Mojang; anyone can join as any name, including an operator's." >&2
 fi
 
+# RCON and the management server stay off unless the owner allowed them with MCSrcon.
+if ! /usr/bin/python3 -I -B "$(dirname "$(readlink -f "$0")")/../lib/MCS/mcsrcon.py" apply "$inst"; then
+  echo "MCS: could not check the remote control settings, so the server was not started." >&2
+  exit 1
+fi
+
 # A symlink named mcs-<instance> makes the process show up under that name in
 # top/htop/system monitors instead of plain 'java'.
 name="$RUNTIME_DIRECTORY/mcs-$inst"

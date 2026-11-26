@@ -138,6 +138,17 @@ for i in $(seq 1 30); do sleep 1; req GET /api/jobs/$JOB; grep -q '"state": "run
 grep -q '"state": "done"' <<<"$BODY" && pass "mod installed via job" || bad "install job" "$BODY"
 req POST /api/instances/smoke/mods '{"specs":["x; rm -rf /"]}'; want "shell metacharacters in mod spec refused" 400
 
+echo "-- remote control settings are the owner's (MCSrcon)"
+RP=/opt/minecraft/instance/smoke/server.properties
+su minecraft -s /bin/bash -c "sed -i '/^rcon.password=/d' $RP; echo 'rcon.password=s3cretvalue' >> $RP"
+req GET /api/instances/smoke; want "instance details load" 200
+grep -q 's3cretvalue' <<<"$BODY" && bad "RCON password reaches the web page" || pass "RCON password is hidden"
+req PUT /api/instances/smoke/properties '{"values":{"enable-rcon":"true"}}'; want "web cannot switch RCON on" 400 'MCSrcon'
+req PUT /api/instances/smoke/properties '{"values":{"rcon.password":"x"}}'; want "web cannot set the RCON password" 400
+req PUT /api/instances/smoke/properties '{"values":{"management-server-enabled":"true"}}'; want "web cannot switch the management server on" 400
+req PUT /api/instances/smoke/properties '{"values":{"motd":"a enable-rcon=true"}}'; want "a hidden line break in a value is refused" 400
+su minecraft -s /bin/bash -c "sed -i 's/^rcon.password=.*/rcon.password=/' $RP"
+
 echo "-- settings & create"
 req PUT /api/settings '{"curseforge_key":"abcdefghij1234"}'; want "the web page cannot store a CurseForge key" 405
 req POST /api/instances '{"name":"../x","agree":true}'; want "bad new-server name refused" 400

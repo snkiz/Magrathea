@@ -51,6 +51,7 @@ LIB = Path(__file__).resolve().parent
 sys.path.insert(0, str(LIB))
 import mcsbackup as mb  # noqa: E402
 import mcsfetch as mf  # noqa: E402
+import mcsrcon as mr  # noqa: E402
 import mcsmodcheck as modcheck  # noqa: E402
 
 HOME, INSTANCES = mf.HOME, mf.INSTANCES
@@ -175,6 +176,17 @@ def read_conf(d: Path) -> dict:
     return out
 
 
+# Remote control settings: shown but not changeable here (MCSrcon on the server), passwords hidden.
+SECRET_PROPS = ("rcon.password", "management-server-secret", "management-server-tls-keystore-password")
+# Line breaks Python knows but a form field should never carry; they would split a settings line.
+CONTROL_CHARS = r"[\x00-\x1f\x7f\x85\u2028\u2029]"
+
+
+def remote_key(key: str) -> bool:
+    k = key.strip()
+    return k == "enable-rcon" or k.startswith(("rcon.", "management-server-"))
+
+
 def read_props(d: Path) -> list[dict]:
     p = d / "server.properties"
     items = []
@@ -182,7 +194,12 @@ def read_props(d: Path) -> list[dict]:
         for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
             if line and not line.startswith("#") and "=" in line:
                 k, _, v = line.partition("=")
-                items.append({"key": k, "value": v})
+                item = {"key": k, "value": v}
+                if remote_key(k):
+                    item["locked"] = True
+                    if k in SECRET_PROPS and v:
+                        item["value"] = "(hidden)"
+                items.append(item)
     return items
 
 
@@ -285,7 +302,7 @@ def validate_service(values: dict) -> dict:
     for k, v in values.items():
         if k not in SERVICE_FIELDS:
             raise ApiError(400, f"unknown setting {k}")
-        if not isinstance(v, str) or re.search(r"[\x00-\x1f\x7f]", v) or len(v) > 4000:
+        if not isinstance(v, str) or re.search(CONTROL_CHARS, v) or len(v) > 4000:
             raise ApiError(400, f"{k}: single line of text, please")
         v = v.strip()
         if k == "SERVER":
@@ -311,8 +328,10 @@ def validate_service(values: dict) -> dict:
 
 def save_properties(d: Path, updates: dict) -> None:
     for k, v in updates.items():
-        if not PROP_KEY.match(k) or not isinstance(v, str) or re.search(r"[\x00-\x1f\x7f]", v) or len(v) > 1000:
+        if not PROP_KEY.match(k) or not isinstance(v, str) or re.search(CONTROL_CHARS, v) or len(v) > 1000:
             raise ApiError(400, f"bad value for {k}")
+        if remote_key(k):
+            raise ApiError(400, f"{k} cannot be changed from the web page; the owner uses MCSrcon on the server")
     p = d / "server.properties"
     lines = p.read_text(encoding="utf-8").splitlines() if p.is_file() else []
     seen = set()
@@ -858,7 +877,13 @@ def api_modcheck(h, m, q, body):
 @route("GET", "/api/notices")
 def api_notices(h, m, q, body):
     out = mb.notices_all()
+    remote = mr.load()
     for name in instance_names():
+        if remote.get(name):
+            what = " and ".join("RCON" if c == "rcon" else "the management server" for c in remote[name])
+            out.append({"id": f"remote:{name}:{'+'.join(remote[name])}", "level": "bad", "server": name, "tab": "settings",
+                        "text": f"{name}: remote control is allowed ({what}). It keeps working if a web key is revoked.",
+                        "howto": None})
         try:
             problems = [p for p in mod_problems(name) if p["level"] == "bad"]
         except Exception:  # noqa: BLE001 - a odd jar must never break the notices
