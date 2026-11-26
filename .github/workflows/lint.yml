@@ -3,6 +3,7 @@ name: Lint
 # Cheap checks that catch typo-level mistakes before anyone installs the thing.
 # This does NOT run the test suite in tests/: those need a disposable systemd machine
 # with a real "minecraft" user, which a normal CI runner is not (see tests/README.md).
+# Archive-v1/ is skipped by every check: it is kept as it was, mistakes included.
 
 on:
   push:
@@ -21,7 +22,7 @@ jobs:
       - name: No Windows line endings
         # A carriage return after "#!/bin/bash" makes a script fail on Linux.
         run: |
-          if git grep -lI $'\r' -- . ':!*.ttf'; then
+          if git grep -lI $'\r' -- . ':!*.ttf' ':!Archive-v1'; then
             echo "These files have CRLF line endings." >&2
             exit 1
           fi
@@ -36,7 +37,7 @@ jobs:
       - name: Shell scripts parse
         run: |
           status=0
-          for f in $(git ls-files); do
+          for f in $(git ls-files -- . ':!Archive-v1'); do
             case "$f" in *.ttf) continue;; esac
             if head -n1 "$f" | grep -qE '^#!.*(bash|/sh)'; then
               bash -n "$f" || { echo "syntax error in $f" >&2; status=1; }
@@ -48,7 +49,7 @@ jobs:
       - name: shellcheck (errors only)
         # Only real errors fail the build for now. Warnings are shown in the log, not enforced.
         run: |
-          files=$(for f in $(git ls-files); do
+          files=$(for f in $(git ls-files -- . ':!Archive-v1'); do
             case "$f" in *.ttf) continue;; esac
             head -n1 "$f" | grep -qE '^#!.*(bash|/sh)' && echo "$f"
           done)
@@ -58,7 +59,7 @@ jobs:
       - name: Python compiles
         run: |
           python3 --version
-          python3 -m py_compile $(git ls-files '*.py')
+          python3 -m py_compile $(git ls-files -- '*.py' ':!Archive-v1')
 
       - name: JavaScript parses
         run: node --check v2/mcs/lib/MCS/web/app.js
