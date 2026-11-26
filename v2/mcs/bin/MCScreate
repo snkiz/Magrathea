@@ -33,7 +33,7 @@ done
 mkdir -- "$mcsHI/$INSTANCE" || exit 1
 # The token records your agreement. The template eula.txt (in the read-only program
 # folder) stays false, so always write the instance's own copy true.
-sed 's/^eula=false/eula=true/' "$EULA" > "$mcsHI/$INSTANCE/eula.txt"
+sed -e 's/^eula=false/eula=true/' -e "$(stamp)" "$EULA" > "$mcsHI/$INSTANCE/eula.txt"
 ### copy jar file and mods/configs. ###
 echo -e "\nCopy your jar into the import folder. If you have mods put them \n\
 into the mods folder, and if you've configured them put the configs in the config \n\

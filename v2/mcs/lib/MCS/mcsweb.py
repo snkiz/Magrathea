@@ -348,6 +348,12 @@ def save_properties(d: Path, updates: dict) -> None:
 # --------------------------------------------------------------------------
 # Creating servers, EULA
 # --------------------------------------------------------------------------
+def stamp(text: str) -> str:
+    """Give line 2 of a Minecraft file today's date, as Minecraft writes it (same as MCS.lib)."""
+    now = time.strftime("%a %b %d %H:%M:%S %Z %Y")
+    return re.sub(r"\A(.*\n)#.*", lambda m: f"{m.group(1)}#{now}", text)
+
+
 def eula_agreed() -> bool:
     return EULA_TOKEN.is_file() and EULA_TOKEN.read_text().strip() == "true"
 
@@ -372,8 +378,8 @@ def create_instance(name: str, agree: bool, port: int | None = None, op_name: st
     d.mkdir()
     os.chmod(d, 0o2770)
     eula = (LIB / "eula.txt").read_text(encoding="utf-8").replace("eula=false", "eula=true")
-    mf.write_atomic(d / "eula.txt", eula)
-    props = (LIB / "server.properties").read_text(encoding="utf-8")
+    mf.write_atomic(d / "eula.txt", stamp(eula))
+    props = stamp((LIB / "server.properties").read_text(encoding="utf-8"))
     props = re.sub(r"^level-name=NULL", f"level-name={name}", props, flags=re.M)
     props = re.sub(r"^motd=.*", f"motd=Welcome to {name}", props, flags=re.M)
     mf.write_atomic(d / "server.properties", props)

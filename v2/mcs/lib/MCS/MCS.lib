@@ -55,12 +55,16 @@ WARNING - the import folder is emptied on completion."
  find "$src" -mindepth 1 -delete
  mkdir -p "$src/mods" "$src/config"
 }
+stamp () {  ### sed expression: give line 2 of a Minecraft file today's date, as Minecraft writes it
+ printf '2s/^#.*/#%s/' "$(LC_ALL=C date '+%a %b %d %H:%M:%S %Z %Y')"
+}
 conf () {  ### service and properties files
  local d="$mcsHI/$INSTANCE" jars=()
  mapfile -t jars < <(find "$d" -maxdepth 1 -name '*.jar' -printf '%f\n')
  if [[ ! -f "$d/server.properties" ]]; then
    echo -e "\nserver.properties not found! Installing..."
    install -m 660 "$LIB/server.properties" "$d/server.properties"
+  sed -i "$(stamp)" "$d/server.properties"
    sed -i -e "s|^level-name=NULL|level-name=${INSTANCE}|" \
           -e "s|^motd=.*|motd=Welcome to ${INSTANCE}|" "$d/server.properties"
  fi
