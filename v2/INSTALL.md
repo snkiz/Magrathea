@@ -4,6 +4,8 @@ MCS runs several Minecraft servers on one Linux machine under systemd, and gives
 (and some commands) to manage them: create servers, add mods, back them up, restore them.
 It is a package manager for servers, not a launcher: you decide what runs.
 
+**Recommended for a home server:** an Ubuntu LTS release.
+
 **Tested on:** Ubuntu 26.04 under WSL2, Python 3.14, systemd 259. Other Debian/Ubuntu versions should
 work but have not been tried. A physical machine (Debian) is the next thing to test.
 
@@ -14,17 +16,25 @@ work but have not been tried. A physical machine (Debian) is the next thing to t
 - These packages (Debian/Ubuntu names):
 
   ```
-  sudo apt install python3 sudo polkitd acl openjdk-21-jre-headless
+  sudo apt install python3 sudo polkitd acl openjdk-25-jre-headless
   ```
 
   - `polkitd`: without it the web page cannot start or stop servers. A desktop system (Wayland or X11)
     already has it, along with `pkexec`; MCS only needs the daemon, not `pkexec`. The installer notices
     when it is missing and says so.
   - `acl`: optional, keeps new files in the right group automatically.
-  - **Java**: Minecraft 1.20.5 and newer needs Java 21. Older versions need Java 17 (1.18 to 1.20.4)
-    or older. Install the Java a version needs before you start it; MCS lists the ones it finds in
-    `/usr/lib/jvm` on the server's Settings tab. (Debian 12 only packages Java 17; for newer Minecraft use
-    Debian 13 or a newer Ubuntu, or install Java 21 from another source such as Adoptium.)
+  - **Java**: which one you need depends on the Minecraft version.
+
+    | Minecraft | Java | Package |
+    | --- | --- | --- |
+    | 26.1 and newer | 25 | `openjdk-25-jre-headless` |
+    | 1.20.5 to 1.21.x | 21 | `openjdk-21-jre-headless` |
+    | 1.18 to 1.20.4 | 17 | `openjdk-17-jre-headless` |
+
+    Versions before 1.18 need something older. Install the Java a version needs before you download its
+    server jar; MCS then points the server at it, and lists the ones it finds in `/usr/lib/jvm` on the
+    server's Settings tab. Not every Debian or Ubuntu release packages every Java. If `apt` cannot find
+    one, use another source such as Adoptium.
 - Python 3 only, nothing from pip. (Developed and tested with 3.14; older versions are untested.)
 
 ## Install
