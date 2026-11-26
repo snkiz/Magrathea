@@ -142,6 +142,13 @@ if command -v setfacl >/dev/null; then
 fi
 usermod -aG "$mcuser" "$SUDO_USER"
 
+# A web interface that is already running still has the old program loaded, so restart it.
+# try-restart does nothing if it is not running. Minecraft servers are not touched.
+if systemctl is-active --quiet MCSweb; then
+  echo "Restarting the web interface so it runs the new version (a job running in it is stopped)."
+  systemctl try-restart MCSweb || echo "NOTE: the restart failed; run: sudo systemctl restart MCSweb"
+fi
+
 echo -e "\nYour shiny new home for Minecraft is done.
 Log out and back in so your new '$mcuser' group membership takes effect.
 Check MCShelp, or INSTALL.md. The MCS program is in $prefix (owned by root) and
