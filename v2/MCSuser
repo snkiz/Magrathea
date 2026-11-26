@@ -133,7 +133,10 @@ chown -hR "$mcuser:$mcuser" "$mchome"
 chmod -R g+rwX,o-rwx "$mchome"
 find "$mchome" -type d -exec chmod g+s {} +
 # The group-write rule above must not loosen the one secret kept here.
-[[ -f "$mchome/.config/MCS/curseforge.key" ]] && chmod 600 "$mchome/.config/MCS/curseforge.key"
+if [[ -f "$mchome/.config/MCS/curseforge.key" ]]; then
+  chmod 600 "$mchome/.config/MCS/curseforge.key"
+  echo "NOTE: $mchome/.config/MCS/curseforge.key is no longer used. Mods can read it, so delete it."
+fi
 if command -v setfacl >/dev/null; then
   setfacl -Rdm u::rwX,g:"$mcuser":rwX,o::- "$mchome"
 fi

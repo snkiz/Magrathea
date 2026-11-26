@@ -131,7 +131,7 @@ grep -q '"state": "inactive"' <<<"$BODY" && pass "server stopped after ~$((i*2))
 echo "-- mods through the UI backend (Modrinth)"
 req GET "/api/instances/smoke/search?q=lithium"; want "search Modrinth" 200 '"source": "modrinth"'
 grep -q '"url": "https://modrinth.com/project/' <<<"$BODY" && pass "results link back to the Modrinth page" || bad "no page url in results"
-req GET "/api/instances/smoke/search?q=lithium&source=curseforge"; want "CurseForge without key is a clear error" 502 'API key'
+req GET "/api/instances/smoke/search?q=lithium&source=curseforge"; want "CurseForge without a project key is a clear error" 502 'not available in this build'
 req POST /api/instances/smoke/mods '{"specs":["modrinth:ferrite-core"]}'; want "install job starts" 200
 JOB=$(grep -o '"id": "[0-9a-f]*"' <<<"$BODY" | head -1 | cut -d'"' -f4)
 for i in $(seq 1 30); do sleep 1; req GET /api/jobs/$JOB; grep -q '"state": "running"' <<<"$BODY" || break; done
@@ -139,7 +139,7 @@ grep -q '"state": "done"' <<<"$BODY" && pass "mod installed via job" || bad "ins
 req POST /api/instances/smoke/mods '{"specs":["x; rm -rf /"]}'; want "shell metacharacters in mod spec refused" 400
 
 echo "-- settings & create"
-req PUT /api/settings '{"curseforge_key":"not a key!"}'; want "garbage CurseForge key refused" 400
+req PUT /api/settings '{"curseforge_key":"abcdefghij1234"}'; want "the web page cannot store a CurseForge key" 405
 req POST /api/instances '{"name":"../x","agree":true}'; want "bad new-server name refused" 400
 req POST /api/instances '{"name":"smoke","agree":true}'; want "duplicate name refused" 409
 req POST /api/instances '{"name":"webmade","agree":true,"op_name":"Notch","port":25590}'; want "create server" 200

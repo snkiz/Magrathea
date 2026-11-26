@@ -32,8 +32,8 @@ check "mods dir is empty again"           0 test -z "$(ls -A "$MCS_HOME/instance
 check "paper jar (dry run)"               0 $M jar pap --type paper --mc 1.21.11 -n
 check "paper plugin from Modrinth"        0 $M add pap luckperms --mc 1.21.11 --loader paper
 check "plugins dir is setgid group-rwx"   0 test "$(stat -c %a "$MCS_HOME/instance/pap/plugins")" = 2770
-check "curseforge refused for paper"      1 env CURSEFORGE_API_KEY=x $M add pap curseforge:1
-check "curseforge without a key"          1 env -u CURSEFORGE_API_KEY $M add fab curseforge:1
+check "curseforge refused for paper"      1 $M add pap curseforge:1
+check "curseforge without a project key"  1 $M add fab curseforge:1
 
 echo "-- download safety"
 python3 -I - "$HERE/mcs/lib/MCS" <<'PY'

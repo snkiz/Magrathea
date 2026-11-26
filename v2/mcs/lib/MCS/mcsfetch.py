@@ -34,7 +34,8 @@ import urllib.request
 from pathlib import Path
 
 VERSION = "2.0"
-UA = f"MCS-fetch/{VERSION}"
+# Sent with every request so the services can tell who is calling and where to complain.
+UA = f"Magrathea/{VERSION} (https://github.com/snkiz/Magrathea)"
 
 LIB_DIR = Path(__file__).resolve().parent  # the program (root-owned): templates, web files
 # The data folder (servers, backups, config) is separate from the program. MCS_HOME overrides it.
@@ -51,11 +52,29 @@ ALLOWED_HOSTS = {
 }
 MAX_DOWNLOAD = 2 << 30  # 2 GiB
 
-MOJANG_MANIFEST = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
-PAPER = "https://fill.papermc.io/v3/projects/paper"
-FABRIC = "https://meta.fabricmc.net/v2/versions"
-MR = "https://api.modrinth.com/v2"
-CF = "https://api.curseforge.com/v1"
+# Every API MCS asks questions of. All requests go through api_get(), so the rules for talking to
+# each one live here. "cache" is how many seconds an answer may be reused; 0 means ask every time.
+PLATFORMS = {
+    "mojang": {"base": "https://piston-meta.mojang.com", "cache": 0},
+    "mojang-profile": {"base": "https://api.mojang.com", "cache": 0},
+    "paper": {"base": "https://fill.papermc.io/v3/projects/paper", "cache": 300},
+    "fabric": {"base": "https://meta.fabricmc.net/v2/versions", "cache": 0},
+    "modrinth": {"base": "https://api.modrinth.com/v2", "cache": 0},
+    # CurseForge's API terms (3.1e) forbid saving or caching anything from it. Leave this at 0.
+    "curseforge": {"base": "https://api.curseforge.com/v1", "cache": 0},
+}
+MOJANG_MANIFEST = "/mc/game/version_manifest_v2.json"
+MAX_WAIT = 60  # longest pause, in seconds, when a service says to slow down
+
+# --- CurseForge project key ------------------------------------------------
+# CurseForge issues a key to a project, not to each person who runs it. This line is the only
+# place MCS keeps it.
+#  * Empty means this build has no CurseForge. Modrinth works as normal.
+#  * The key belongs to this project. If you change the code and share it, put your own key
+#    here or leave it empty.
+#  * Terms: https://support.curseforge.com/en/support/solutions/articles/9000207405
+CURSEFORGE_KEY = ""
+# ---------------------------------------------------------------------------
 CF_GAME_MINECRAFT = 432
 CF_CLASS_MODS = 6
 CF_LOADERS = {"forge": 1, "fabric": 4, "quilt": 5, "neoforge": 6}
@@ -97,32 +116,76 @@ def check_url(url: str) -> None:
 class _SafeRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         check_url(newurl)
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        # an API key is only for the host it was meant for: do not carry it to another one
+        if new and urllib.parse.urlparse(newurl).hostname != urllib.parse.urlparse(req.full_url).hostname:
+            new.remove_header("X-api-key")
+        return new
 
 
 _opener = urllib.request.build_opener(_SafeRedirect)
+_cache: dict[str, tuple[float, bytes]] = {}  # in memory only: gone when the program stops
+_wait_until: dict[str, float] = {}
 
 
-def http_json(url: str, params: dict | None = None, headers: dict | None = None):
-    if params:
-        url += ("&" if "?" in url else "?") + urllib.parse.urlencode(params)
-    check_url(url)
+def cf_key() -> str:
+    if not CURSEFORGE_KEY:
+        raise McsError("CurseForge is not available in this build. Modrinth works without a key.")
+    return CURSEFORGE_KEY
+
+
+def _seconds(value, default: float) -> float:
+    """A wait time from a response header, kept between 0 and MAX_WAIT."""
+    try:
+        return min(max(float(value), 0), MAX_WAIT)
+    except (TypeError, ValueError):
+        return default
+
+
+def _fetch(platform: str, url: str, headers: dict) -> bytes:
     last = None
     for attempt in range(3):
+        pause = _wait_until.get(platform, 0) - time.monotonic()
+        if pause > 0:
+            time.sleep(pause)
         req = urllib.request.Request(
-            url, headers={"User-Agent": UA, "Accept": "application/json", **(headers or {})})
+            url, headers={"User-Agent": UA, "Accept": "application/json", **headers})
         try:
             with _opener.open(req, timeout=30) as r:
-                return json.load(r)
+                if r.headers.get("X-Ratelimit-Remaining") == "0":  # used up: hold the next request
+                    _wait_until[platform] = time.monotonic() + _seconds(r.headers.get("X-Ratelimit-Reset"), 1)
+                return r.read()
         except urllib.error.HTTPError as e:
             if e.code in (429, 500, 502, 503, 504) and attempt < 2:
-                time.sleep(2 * (attempt + 1))
+                told = e.headers.get("Retry-After") or e.headers.get("X-Ratelimit-Reset")
+                time.sleep(_seconds(told, 2 * (attempt + 1)))
                 continue
             raise McsError(f"HTTP {e.code} from {url.split('?')[0]}") from None
         except (urllib.error.URLError, TimeoutError) as e:
             last = e
             time.sleep(1)
     raise McsError(f"cannot reach {url.split('?')[0]}: {last}")
+
+
+def api_get(platform: str, route: str = "", params: dict | None = None):
+    """The one way MCS asks an API something. Callers name the platform and the path under it,
+    never a whole address, so a key can only be sent to the service it belongs to."""
+    rules = PLATFORMS[platform]
+    if route and not route.startswith("/"):
+        raise McsError(f"bad API route {route!r}")
+    url = rules["base"] + route
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    check_url(url)
+    headers = {"x-api-key": cf_key()} if platform == "curseforge" else {}
+    hit = _cache.get(url)
+    if rules["cache"] and hit and time.monotonic() - hit[0] < rules["cache"]:
+        return json.loads(hit[1])
+    body = _fetch(platform, url, headers)
+    data = json.loads(body)
+    if rules["cache"]:
+        _cache[url] = (time.monotonic(), body)
+    return data
 
 
 def safe_name(name: str) -> str:
@@ -260,14 +323,22 @@ def find_java(major: int) -> str | None:
 # Server jars
 # --------------------------------------------------------------------------
 def mojang_manifest() -> dict:
-    return http_json(MOJANG_MANIFEST)
+    return api_get("mojang", MOJANG_MANIFEST)
+
+
+def mojang_entry(url: str) -> dict:
+    """The manifest lists a full address for each version; accept only ones on the same host."""
+    base = PLATFORMS["mojang"]["base"]
+    if not url.startswith(base + "/"):
+        raise McsError(f"unexpected address in Mojang's version list: {url!r}")
+    return api_get("mojang", url[len(base):])
 
 
 def mojang_java(mc: str) -> int | None:
     entry = next((v for v in mojang_manifest()["versions"] if v["id"] == mc), None)
     if not entry:
         return None
-    return (http_json(entry["url"]).get("javaVersion") or {}).get("majorVersion")
+    return (mojang_entry(entry["url"]).get("javaVersion") or {}).get("majorVersion")
 
 
 def is_release(v: str) -> bool:
@@ -276,7 +347,7 @@ def is_release(v: str) -> bool:
 
 def paper_versions() -> list[str]:
     out: list[str] = []
-    for group in http_json(PAPER)["versions"].values():
+    for group in api_get("paper")["versions"].values():
         out.extend(group)
     return out
 
@@ -287,7 +358,7 @@ def list_versions(kind: str) -> list[str]:
     if kind == "paper":
         return [v for v in paper_versions() if is_release(v)]
     if kind == "fabric":
-        return [g["version"] for g in http_json(f"{FABRIC}/game") if g["stable"]]
+        return [g["version"] for g in api_get("fabric", "/game") if g["stable"]]
     raise McsError(f"unknown server type {kind!r}")
 
 
@@ -303,7 +374,7 @@ def resolve_jar(kind: str, mc: str) -> dict:
         entry = next((v for v in mojang_manifest()["versions"] if v["id"] == mc), None)
         if not entry:
             raise McsError(f"Mojang has no version {mc!r}")
-        srv = http_json(entry["url"])["downloads"].get("server")
+        srv = mojang_entry(entry["url"])["downloads"].get("server")
         if not srv:
             raise McsError(f"{mc} has no server download")
         return {"mc": mc, "url": srv["url"], "file": f"minecraft_server.{mc}.jar",
@@ -311,21 +382,21 @@ def resolve_jar(kind: str, mc: str) -> dict:
     if kind == "paper":
         if mc not in paper_versions():
             raise McsError(f"Paper has no version {mc!r}")
-        b = http_json(f"{PAPER}/versions/{urllib.parse.quote(mc)}/builds/latest")
+        b = api_get("paper", f"/versions/{urllib.parse.quote(mc)}/builds/latest")
         dl = b["downloads"]["server:default"]
         note = "" if b.get("channel") == "STABLE" else f"this Paper build is on the {b.get('channel')} channel"
         return {"mc": mc, "url": dl["url"], "file": dl["name"],
                 "hashes": {"sha256": dl["checksums"]["sha256"]}, "java": java, "note": note}
     if kind == "fabric":
-        loaders = http_json(f"{FABRIC}/loader/{urllib.parse.quote(mc)}")
+        loaders = api_get("fabric", f"/loader/{urllib.parse.quote(mc)}")
         if not loaders:
             raise McsError(f"Fabric does not support Minecraft {mc!r}")
         loader = next((x["loader"]["version"] for x in loaders if x["loader"]["stable"]),
                       loaders[0]["loader"]["version"])
-        installer = next((x["version"] for x in http_json(f"{FABRIC}/installer") if x["stable"]), None)
+        installer = next((x["version"] for x in api_get("fabric", "/installer") if x["stable"]), None)
         if not installer:
             raise McsError("could not find a Fabric installer version")
-        url = f"{FABRIC}/loader/{urllib.parse.quote(mc)}/{loader}/{installer}/server/jar"
+        url = f"{PLATFORMS['fabric']['base']}/loader/{urllib.parse.quote(mc)}/{loader}/{installer}/server/jar"
         return {"mc": mc, "url": url, "file": f"fabric-server-mc.{mc}-loader.{loader}-launcher.{installer}.jar",
                 "hashes": {}, "java": java, "loader_version": loader,
                 "note": "Fabric publishes no checksum for this jar; its sha256 is recorded in mcs.json"}
@@ -400,22 +471,6 @@ def need_ctx(d: Path, a) -> dict:
     return meta
 
 
-def cf_key() -> str:
-    key = os.environ.get("CURSEFORGE_API_KEY", "").strip()
-    if not key:
-        p = HOME / ".config" / "MCS" / "curseforge.key"
-        if p.is_file():
-            key = p.read_text().strip()
-    if not key:
-        raise McsError("CurseForge needs a free API key (https://console.curseforge.com). Put it in "
-                       f"{HOME / '.config/MCS/curseforge.key'} (chmod 600) or set CURSEFORGE_API_KEY.")
-    return key
-
-
-def cf_get(path: str, params: dict | None = None):
-    return http_json(CF + path, params, {"x-api-key": cf_key()})
-
-
 class Resolver:
     """Works out which files to install: the mod plus its required dependencies."""
 
@@ -430,11 +485,11 @@ class Resolver:
     # -- Modrinth --
     def mr_project(self, ref: str) -> dict:
         if ref not in self._projects:
-            self._projects[ref] = http_json(f"{MR}/project/{urllib.parse.quote(ref)}")
+            self._projects[ref] = api_get("modrinth", f"/project/{urllib.parse.quote(ref)}")
         return self._projects[ref]
 
     def mr_version(self, project: str) -> dict:
-        vs = http_json(f"{MR}/project/{urllib.parse.quote(project)}/version", {
+        vs = api_get("modrinth", f"/project/{urllib.parse.quote(project)}/version", {
             "loaders": json.dumps(MR_LOADERS[self.loader]), "game_versions": json.dumps([self.mc])})
         vs.sort(key=lambda v: v["date_published"], reverse=True)
         pick = [v for v in vs if v["version_type"] == "release"]
@@ -454,7 +509,7 @@ class Resolver:
             return
         if proj.get("server_side") == "unsupported":
             raise McsError(f"{proj['title']} is client-only and does nothing on a server")
-        v = http_json(f"{MR}/version/{version_id}") if version_id else self.mr_version(proj["id"])
+        v = api_get("modrinth", f"/version/{version_id}") if version_id else self.mr_version(proj["id"])
         f = next((x for x in v["files"] if x.get("primary")), v["files"][0])
         hashes = {k: f["hashes"][k] for k in ("sha512", "sha1") if k in f["hashes"]}
         self.plan[key] = {"source": "modrinth", "project": proj["id"], "slug": proj["slug"],
@@ -465,7 +520,7 @@ class Resolver:
             for dep in v.get("dependencies", []):
                 pid, vid = dep.get("project_id"), dep.get("version_id")
                 if not pid and vid:
-                    pid = http_json(f"{MR}/version/{vid}")["project_id"]
+                    pid = api_get("modrinth", f"/version/{vid}")["project_id"]
                 if not pid:
                     continue
                 if dep["dependency_type"] == "required":
@@ -477,9 +532,9 @@ class Resolver:
     def cf_mod(self, ref: str) -> dict:
         if ref not in self._projects:
             if ref.isdigit():
-                self._projects[ref] = cf_get(f"/mods/{ref}")["data"]
+                self._projects[ref] = api_get("curseforge", f"/mods/{ref}")["data"]
             else:
-                hits = cf_get("/mods/search", {"gameId": CF_GAME_MINECRAFT, "classId": CF_CLASS_MODS, "slug": ref})["data"]
+                hits = api_get("curseforge", "/mods/search", {"gameId": CF_GAME_MINECRAFT, "classId": CF_CLASS_MODS, "slug": ref})["data"]
                 if not hits:
                     raise McsError(f"CurseForge has no mod with slug {ref!r}")
                 self._projects[ref] = hits[0]
@@ -494,7 +549,7 @@ class Resolver:
             if key in self.plan and by:
                 self.plan[key]["required_by"].append(by)
             return
-        files = cf_get(f"/mods/{mod['id']}/files", {
+        files = api_get("curseforge", f"/mods/{mod['id']}/files", {
             "gameVersion": self.mc, "modLoaderType": CF_LOADERS[self.loader], "pageSize": 50})["data"]
         files.sort(key=lambda x: x["fileDate"], reverse=True)
         pick = [x for x in files if x["releaseType"] == 1] or (files if self.allow_beta else [])
@@ -663,7 +718,7 @@ def search_rows(query: str, mc: str | None, loader: str | None, source: str = "m
             facets.append([f"versions:{mc}"])
         if loader:
             facets.append([f"categories:{x}" for x in MR_LOADERS.get(loader, [loader])])
-        r = http_json(f"{MR}/search", {"query": query, "limit": limit, "facets": json.dumps(facets)})
+        r = api_get("modrinth", "/search", {"query": query, "limit": limit, "facets": json.dumps(facets)})
         rows += [{"source": "modrinth", "id": h["slug"], "title": h["title"], "downloads": h["downloads"],
                   "description": h["description"], "icon": h.get("icon_url") or "",
                   "url": f"https://modrinth.com/project/{h['slug']}"} for h in r["hits"]]
@@ -679,7 +734,7 @@ def search_rows(query: str, mc: str | None, loader: str | None, source: str = "m
                       "downloads": m["downloadCount"], "description": m["summary"],
                       "icon": (m.get("logo") or {}).get("thumbnailUrl") or "",
                       "url": (m.get("links") or {}).get("websiteUrl") or ""}
-                     for m in cf_get("/mods/search", p)["data"]]
+                     for m in api_get("curseforge", "/mods/search", p)["data"]]
         except McsError as e:
             if source == "curseforge":
                 raise
@@ -705,7 +760,6 @@ def cmd_search(a) -> int:
 # Players (whitelist / ops) and game ports
 # --------------------------------------------------------------------------
 PLAYER_RE = re.compile(r"^[A-Za-z0-9_]{3,16}$")
-MOJANG_PROFILE = "https://api.mojang.com/users/profiles/minecraft"
 
 
 def read_prop(d: Path, key: str, default: str = "") -> str:
@@ -736,7 +790,7 @@ def lookup_player(name: str, online: bool) -> tuple[str, str]:
     if not online:
         return offline_uuid(name), name
     try:
-        r = http_json(f"{MOJANG_PROFILE}/{urllib.parse.quote(name)}")
+        r = api_get("mojang-profile", f"/users/profiles/minecraft/{urllib.parse.quote(name)}")
     except ValueError:  # empty body: Mojang's "no such player"
         raise McsError(f"Mojang has no player called {name!r}. Check the spelling.") from None
     except McsError as e:

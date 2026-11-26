@@ -61,7 +61,6 @@ OLD_TOKEN_FILE = CONF_DIR / "web.token"  # pre-keys single token; deleted on sta
 # Keys are root-owned and only READABLE here: the web service (and so a mod, which runs as
 # the same user) can check a key but cannot add or revoke one. Managed by MCSkey (sudo).
 KEYS_FILE = Path("/etc/MCS/keys.json")
-CF_KEY_FILE = CONF_DIR / "curseforge.key"
 EULA_TOKEN = CONF_DIR / "EULA.token"  # in the data folder: the program folder is read-only
 ORIG_ERR = sys.stderr
 
@@ -893,24 +892,8 @@ def api_backup_schedule_set(h, m, q, body):
 
 @route("GET", r"/api/settings")
 def api_settings(h, m, q, body):
-    return {"curseforge_key_set": CF_KEY_FILE.is_file() and bool(CF_KEY_FILE.read_text().strip()),
+    return {"curseforge_available": bool(mf.CURSEFORGE_KEY),
             "listen": h.server.server_address[0], "port": h.server.server_address[1]}
-
-
-@route("PUT", r"/api/settings")
-def api_settings_put(h, m, q, body):
-    if "curseforge_key" in body:
-        key = str(body["curseforge_key"]).strip()
-        if key and not re.fullmatch(r"[A-Za-z0-9$./+=_-]{10,200}", key):
-            raise ApiError(400, "that does not look like a CurseForge API key")
-        if key:
-            CONF_DIR.mkdir(parents=True, exist_ok=True)
-            fd = os.open(CF_KEY_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "w") as f:
-                f.write(key + "\n")
-        elif CF_KEY_FILE.exists():
-            CF_KEY_FILE.unlink()
-    return {"ok": True}
 
 
 class Handler(http.server.BaseHTTPRequestHandler):

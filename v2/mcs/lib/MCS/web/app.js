@@ -443,8 +443,8 @@ async function tabMods(body, s) {
   /* search */
   const q = h("input", { type: "text", placeholder: `Search ${noun}s for ${info.mc}…`, "aria-label": `Search ${noun}s`, maxlength: "100" });
   const src = h("select", { "aria-label": "Source" }, h("option", { value: "modrinth" }, "Modrinth"),
-    !isPlugin && state.settings.curseforge_key_set ? h("option", { value: "curseforge" }, "CurseForge") : null,
-    !isPlugin && state.settings.curseforge_key_set ? h("option", { value: "both" }, "Both") : null);
+    !isPlugin && state.settings.curseforge_available ? h("option", { value: "curseforge" }, "CurseForge") : null,
+    !isPlugin && state.settings.curseforge_available ? h("option", { value: "both" }, "Both") : null);
   const results = h("div", { class: "list" });
   /* Plain link-outs to the sites themselves: MCS never embeds or proxies their pages. */
   const mrBrowse = isPlugin ? "https://modrinth.com/plugins" : "https://modrinth.com/mods";
@@ -461,7 +461,7 @@ async function tabMods(body, s) {
         results.replaceChildren(...(rows.length ? rows.map(resultRow) : [h("p", { class: "muted" }, "Nothing found for this version and loader (client-only mods are hidden).")]));
       } catch (x) { results.replaceChildren(h("p", { class: "err" }, x.message)); }
     } }, h("div", { class: "grow" }, q), src, h("button", { class: "btn primary", type: "submit" }, "Search")),
-    results, !isPlugin && !state.settings.curseforge_key_set ? h("p", { class: "muted small" }, "CurseForge is available once you add your own free API key in Settings.") : null);
+    results, !isPlugin && !state.settings.curseforge_available ? h("p", { class: "muted small" }, "CurseForge search is not available in this build. You can still download from their site and upload the jar on the Files tab.") : null);
   function resultRow(r) {
     const installed = Object.values(info.mods || {}).some((m) => m.project === r.id || m.slug === r.id);
     return h("div", { class: "item" }, r.icon ? h("img", { class: "icon", src: r.icon, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }) : h("div", { class: "icon" }),
@@ -658,21 +658,10 @@ async function openCreate() {
 
 async function openSettings() {
   state.settings = await api("GET", "/api/settings").catch(() => state.settings);
-  const key = h("input", { type: "password", id: "cfk", placeholder: state.settings.curseforge_key_set ? "(key saved, paste to replace)" : "paste your CurseForge API key", autocomplete: "off" });
   const bg = modal(h("div", {}, h("h2", {}, "Settings"),
-    h("div", { class: "field" }, h("label", { for: "cfk" }, "CurseForge API key (optional)"), key,
-      h("div", { class: "muted small" }, "Modrinth works without a key. To search CurseForge too, make a free key at ", h("a", { href: "https://console.curseforge.com", target: "_blank", rel: "noopener noreferrer" }, "console.curseforge.com ↗"), " and paste it here. Treat it like a password."),
-      h("details", { class: "small" }, h("summary", {}, "What this key is, and where it goes"),
-        h("p", {}, h("strong", {}, "What it is: "), "a key from your own CurseForge account. It lets MCS search CurseForge's mod list and download mods for you. It is only used for that."),
-        h("p", {}, h("strong", {}, "Where it goes: "), "it is saved on this computer in a file only the minecraft user can read, and it is sent only to CurseForge. This page never shows it again after you save it, and it is not written to the logs."),
-        h("p", {}, h("strong", {}, "Careful: "), "anything that runs as the minecraft user can read that file, and that includes the mods and plugins on your servers. Only add mods you trust."),
-        h("p", {}, h("strong", {}, "What it can do: "), "search and download through CurseForge's public mod list, and use up your free allowance there. It cannot spend money."),
-        h("p", {}, h("strong", {}, "To cancel it: "), "sign in at console.curseforge.com, open your API keys and delete or replace it. Then press Remove key here."))),
+    h("p", { class: "small" }, state.settings.curseforge_available ? "Mod search: Modrinth and CurseForge." : "Mod search: Modrinth. CurseForge is not available in this build."),
     h("p", { class: "muted small" }, `This interface is listening on ${state.settings.listen}:${state.settings.port}.`),
-    h("div", { class: "row end" },
-      state.settings.curseforge_key_set ? h("button", { class: "btn danger", onclick: async () => { await act(api("PUT", "/api/settings", { curseforge_key: "" })); bg.remove(); state.settings.curseforge_key_set = false; toast("Key removed"); } }, "Remove key") : null,
-      h("button", { class: "btn", onclick: () => bg.remove() }, "Close"),
-      h("button", { class: "btn primary", onclick: async () => { if (!key.value.trim()) return bg.remove(); await act(api("PUT", "/api/settings", { curseforge_key: key.value })); bg.remove(); state.settings.curseforge_key_set = true; toast("Key saved"); route(); } }, "Save"))));
+    h("div", { class: "row end" }, h("button", { class: "btn", onclick: () => bg.remove() }, "Close"))));
 }
 
 boot();
