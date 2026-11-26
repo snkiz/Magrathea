@@ -156,6 +156,14 @@ req POST /api/instances '{"name":"smoke","agree":true}'; want "duplicate name re
 req POST /api/instances '{"name":"webmade","agree":true,"op_name":"Notch","port":25590}'; want "create server" 200
 grep -q '^eula=true' /opt/minecraft/instance/webmade/eula.txt && pass "new server has eula=true" || bad "eula not set"
 grep -q "^level-seed=$" /opt/minecraft/instance/webmade/server.properties && pass "no seed given: left blank (random world)" || bad "level-seed not blank by default"
+W=/opt/minecraft/instance/webmade/server.properties
+req POST /api/instances/webmade/jar '{"type":"fabric","mc":"1.21.11"}'; want "jar download job starts" 200
+JOB=$(grep -o '"id": "[0-9a-f]*"' <<<"$BODY" | head -1 | cut -d'"' -f4)
+for i in $(seq 1 120); do sleep 2; req GET /api/jobs/$JOB; grep -q '"state": "running"' <<<"$BODY" || break; done
+grep -q '"state": "done"' <<<"$BODY" && pass "jar download job finished" || bad "jar job" "$BODY"
+[[ $(grep -vc '^#' $W) -gt 50 ]] && grep -qx white-list=true $W && grep -qx server-port=25590 $W \
+  && pass "the web download completed server.properties and kept MCS's choices" || bad "server.properties not completed: $(grep -vc '^#' $W) settings"
+test ! -e /opt/minecraft/instance/webmade/webmade && pass "and made no world" || bad "a world was made"
 rm -rf /opt/minecraft/instance/webmade
 req POST /api/instances '{"name":"webseed","agree":true,"op_name":"Notch","port":25591,"seed":"diamond sword 42"}'; want "create server with a seed" 200
 grep -q "^level-seed=diamond sword 42$" /opt/minecraft/instance/webseed/server.properties && pass "the seed is written to server.properties" || bad "seed missing: $(grep level-seed /opt/minecraft/instance/webseed/server.properties)"

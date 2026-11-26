@@ -1,0 +1,18 @@
+#!/bin/bash
+# Started by MCSinit@.service. Has the server jar write the rest of server.properties and stop,
+# without making a world. Settings already in the file are kept.
+# SERVER, JAVA_HOME, RAM and ARGS come from service.conf via systemd.
+inst="$1"
+here="$(dirname "$(readlink -f "$0")")"
+
+# Refuses when there is a world already, or the version would ignore the option and just start.
+/usr/bin/python3 -I -B "$here/../lib/MCS/mcsfetch.py" settings "$inst" --check "$SERVER"
+rc=$?
+[[ $rc -eq 3 ]] && exit 0
+[[ $rc -eq 0 ]] || exit "$rc"
+
+java_bin="java"
+[[ -n "$JAVA_HOME" ]] && java_bin="$JAVA_HOME/bin/java"
+# RAM and ARGS are space separated option lists, so they are left unquoted on purpose.
+# shellcheck disable=SC2086
+exec "$java_bin" $RAM $ARGS -jar "$SERVER" --initSettings nogui

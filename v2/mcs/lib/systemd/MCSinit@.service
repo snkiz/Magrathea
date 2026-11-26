@@ -1,0 +1,32 @@
+## Has a server jar write the rest of server.properties before the world is made.
+## Installed (copied, root-owned) to /etc/systemd/system by MCSuser. Never enabled.
+## It runs the jar (and with Fabric, possibly its mods), so it is locked down like MCS@.service:
+## keep the two in step.
+[Unit]
+Description=Minecraft settings for %i
+After=network.target
+
+[Service]
+Type=oneshot
+TimeoutStartSec=600
+
+User=minecraft
+Group=minecraft
+UMask=0007
+
+ProtectHome=true
+ProtectSystem=strict
+PrivateDevices=true
+NoNewPrivileges=true
+PrivateTmp=true
+InaccessiblePaths=/root /srv -/var -/media -/lost+found
+# The server can only write to its own instance folder.
+ReadWritePaths=/opt/minecraft/instance/%i
+
+WorkingDirectory=/opt/minecraft/instance/%i
+EnvironmentFile=/opt/minecraft/instance/%i/service.conf
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=MCSinit-%i
+
+ExecStart=/opt/mcs/bin/MCS-init %i

@@ -78,15 +78,17 @@ conf () {  ### service and properties files
      echo "Found ${#jars[@]} jar files in the instance; set SERVER= in service.conf yourself."
    fi
  fi
- echo
- read -rp "Would you like to edit the server.properties? Y or n: " -n 1
- echo
- if [[ $REPLY =~ ^[Yy]$ ]]; then "${EDITOR:-nano}" "$d/server.properties"; fi
  echo -e "\nThe service.conf contains your jar file, java version, ram allocation, \n\
 java arguments and a shutdown message with a configurable timer. \n"
  read -rp "Would you like to edit the service.conf? Y or n: " -n 1
  echo
  if [[ $REPLY =~ ^[Yy]$ ]]; then "${EDITOR:-nano}" "$d/service.conf"; fi
+ # The jar named in service.conf completes server.properties (only while there is no world yet).
+ "$(dirname "$LIB")/../bin/MCSfetch" settings "$INSTANCE"
+ echo
+ read -rp "Would you like to edit the server.properties? Y or n: " -n 1
+ echo
+ if [[ $REPLY =~ ^[Yy]$ ]]; then "${EDITOR:-nano}" "$d/server.properties"; fi
 }
 browse () {  ### Open INSTANCE folder.
  echo -e "$xhWARN"

@@ -40,8 +40,8 @@ into the mods folder, and if you've configured them put the configs in the confi
 folder."
 import
 ### install server.properties and service.conf ###
-echo -e "\nExperimental options must be enabled in server.properties \n\
-before initialization/world gen."
+echo -e "\nExperimental options must be set in server.properties \n\
+before the world is made (the first start)."
 conf
 ### game port and first player ###
 fetch="$(cd "$LIB/../../bin" && pwd)/MCSfetch"

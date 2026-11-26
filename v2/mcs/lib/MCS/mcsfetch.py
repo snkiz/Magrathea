@@ -26,12 +26,14 @@ import json
 import os
 import re
 import socket
+import subprocess
 import sys
 import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from pathlib import Path
 
 VERSION = "2.0"
@@ -415,6 +417,78 @@ def resolve_jar(kind: str, mc: str) -> dict:
     raise McsError(f"unknown server type {kind!r}")
 
 
+# --------------------------------------------------------------------------
+# server.properties: MCS writes only its own choices, then the server jar fills in the rest
+# --------------------------------------------------------------------------
+# "--initSettings" makes the jar write its settings and stop without making a world. 1.16.5 is the
+# oldest version this was tested on; 1.12.2 ignores the option and starts the whole server.
+INIT_SINCE = (1, 16, 5)
+
+
+def jar_mc_version(jar: Path) -> str | None:
+    """The Minecraft version a server jar is for, read from inside the jar."""
+    try:
+        with zipfile.ZipFile(jar) as z:
+            names = set(z.namelist())
+            if "install.properties" in names:  # Fabric's launcher
+                m = re.search(r"^game-version=(\S+)", z.read("install.properties").decode("utf-8", "replace"), re.M)
+                return m.group(1) if m else None
+            if "version.json" in names:  # Mojang's jar, and Paper's
+                return str(json.loads(z.read("version.json")).get("id") or "") or None
+    except (OSError, ValueError, KeyError, AttributeError, zipfile.BadZipFile):
+        pass
+    return None
+
+
+def settings_blocker(d: Path, jar: str) -> str | None:
+    """Why the jar must not be asked to write its settings, or None if it is safe to."""
+    if (d / (read_prop(d, "level-name", "world") or "world")).exists():
+        return "the world already exists"
+    if not jar or jar == "NULL" or not (d / jar).is_file():
+        return "no server jar is set"
+    mc = jar_mc_version(d / jar)
+    if not mc or not is_release(mc):
+        return "cannot tell which Minecraft release this jar is"
+    if tuple(int(x) for x in mc.split(".")) < INIT_SINCE:
+        return f"Minecraft {mc} is too old to write its settings without starting"
+    return None
+
+
+def configured_jar(d: Path) -> str:
+    conf = d / "service.conf"
+    lines = conf.read_text(encoding="utf-8", errors="replace").splitlines() if conf.is_file() else []
+    return next((x[7:].strip().strip("\"'") for x in lines if x.startswith("SERVER=")), "")
+
+
+def write_settings(name: str) -> bool:
+    """Have the server complete server.properties, inside the same sandbox a running server has.
+    Failing is harmless: the first start fills the file in anyway."""
+    d = inst_dir(name)
+    why = settings_blocker(d, configured_jar(d))
+    if why:
+        say(f"server.properties left as it is: {why}.")
+        return False
+    say("Asking the server to complete server.properties (no world is made yet)...")
+    try:
+        ok = subprocess.run(["systemctl", "start", f"MCSinit@{name}.service"], timeout=660).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        ok = False
+    if not ok:
+        warn(f"that did not work (see: journalctl -u MCSinit@{name}). "
+             "The first start will fill in server.properties instead.")
+    return ok
+
+
+def cmd_settings(a) -> int:
+    if a.check is not None:  # used by MCS-init, inside the sandbox
+        why = settings_blocker(inst_dir(a.instance), a.check)
+        if why:
+            say(f"MCS: not writing settings: {why}.")
+        return 3 if why else 0
+    write_settings(a.instance)
+    return 0
+
+
 def cmd_versions(a) -> int:
     vs = list_versions(a.type)
     if a.json:
@@ -457,6 +531,8 @@ def cmd_jar(a) -> int:
     if prev and prev != r["mc"] and meta.get("mods"):
         warn(f"Minecraft version changed {prev} -> {r['mc']}; run 'MCSfetch update {a.instance}' to move your mods.")
     save_meta(d, meta)
+    if INSTANCES == Path("/opt/minecraft/instance") and not settings_blocker(d, r["file"]):
+        write_settings(a.instance)
     return 0
 
 
@@ -987,6 +1063,11 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("instance")
     s.add_argument("--port", type=int, required=True)
     s.set_defaults(fn=cmd_setup)
+
+    s = sub.add_parser("settings", help="have the server jar complete server.properties (before the world exists)")
+    s.add_argument("instance")
+    s.add_argument("--check", metavar="JAR", help=argparse.SUPPRESS)
+    s.set_defaults(fn=cmd_settings)
 
     a = p.parse_args(argv)
     try:

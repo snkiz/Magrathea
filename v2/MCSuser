@@ -69,7 +69,7 @@ render () {  # render <file> <destination>: the units are written for /opt/mcs a
   sed -e "s|/opt/mcs|$prefix|g" -e "s|/opt/minecraft|$mchome|g" "$1" > "$t"
   install -m 644 -o root -g root "$t" "$2"; rm -f "$t"
 }
-for u in MCS@.service MCS@.socket MCScred.socket MCScred.service MCSweb.service MCSbackup.service MCSbackup.timer MCSoffbox.service MCSoffbox.timer; do
+for u in MCS@.service MCS@.socket MCSinit@.service MCScred.socket MCScred.service MCSweb.service MCSbackup.service MCSbackup.timer MCSoffbox.service MCSoffbox.timer; do
   render "$SKEL/lib/systemd/$u" "/etc/systemd/system/$u"
 done
 systemctl daemon-reload
