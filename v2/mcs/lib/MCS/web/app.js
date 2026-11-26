@@ -436,7 +436,7 @@ async function tabMods(body, s) {
         if (info.mods && Object.keys(info.mods).length && !confirm("Changing the Minecraft version can break installed mods. Continue?")) return;
         startJob(api("POST", `/api/instances/${s.name}/jar`, { type: typeSel.value, mc: verSel.value }), refresh);
       } }, "Download")),
-    h("p", { class: "muted small" }, "Forge and NeoForge are not supported yet. Upload their jars on the Files tab if you need them. Stop the server before changing its jar."));
+    h("p", { class: "muted small" }, "Forge and NeoForge are not supported yet: their downloads are installers, not server jars. Stop the server before changing its jar."));
   body.append(jarCard);
 
   if (!info.loader) { body.append(h("div", { class: "note" }, "Vanilla servers take no mods. Choose Fabric (mods) or Paper (plugins) above.")); return; }
