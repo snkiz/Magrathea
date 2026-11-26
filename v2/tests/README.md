@@ -21,11 +21,12 @@ sudo bash tests/wsl-backup.sh                           # backups, restore, rete
 sudo bash tests/wsl-offbox.sh                           # the separate copy
 sudo bash tests/wsl-modcheck.sh                         # the mod pre-check
 sudo bash tests/wsl-remote.sh                           # RCON and the management server stay off unless allowed
+sudo bash tests/wsl-cred.sh                             # the key broker (removes any key set with MCScred)
 sudo SUDO_USER=$USER bash tests/wsl-full.sh teardown    # remove everything again
 ```
 
 `wsl-offbox-disk.sh` makes a small loop-mounted disk to test the separate copy on a real second device.
-`remote-control.py` and `api-boundary.py` need only Python and are safe to run anywhere:
+`remote-control.py`, `broker.py` and `api-boundary.py` need only Python and are safe to run anywhere:
 `python3 -I tests/remote-control.py`.
 
 The scripts print `PASS` and `FAIL` lines and end with a count; read the `FAIL` lines first.

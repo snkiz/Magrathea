@@ -74,9 +74,9 @@ teardown_stage () {
   systemctl stop "MCS@$INST" 2>/dev/null
   systemctl disable "MCS@$INST" 2>/dev/null
   systemctl disable --now MCSweb 2>/dev/null
-  systemctl disable --now MCSbackup.timer MCSoffbox.timer 2>/dev/null
-  rm -f /etc/systemd/system/MCS@.service /etc/systemd/system/MCS@.socket /etc/systemd/system/MCSweb.service /etc/systemd/system/MCSbackup.service /etc/systemd/system/MCSbackup.timer /etc/systemd/system/MCSoffbox.service /etc/systemd/system/MCSoffbox.timer /etc/polkit-1/rules.d/50-mcs.rules /etc/profile.d/mcs.sh
-  for t in MCSimport MCScreate MCSbrowse MCSconf MCSfetch MCSweb MCSkey MCSrcon MCSoffbox MCSbackup MCShelp; do rm -f "/usr/local/bin/$t"; done
+  systemctl disable --now MCSbackup.timer MCSoffbox.timer MCScred.socket 2>/dev/null; systemctl stop MCScred.service 2>/dev/null
+  rm -f /etc/systemd/system/MCScred.socket /etc/systemd/system/MCScred.service /etc/systemd/system/MCS@.service /etc/systemd/system/MCS@.socket /etc/systemd/system/MCSweb.service /etc/systemd/system/MCSbackup.service /etc/systemd/system/MCSbackup.timer /etc/systemd/system/MCSoffbox.service /etc/systemd/system/MCSoffbox.timer /etc/polkit-1/rules.d/50-mcs.rules /etc/profile.d/mcs.sh
+  for t in MCSimport MCScreate MCSbrowse MCSconf MCSfetch MCSweb MCSkey MCSrcon MCScred MCSoffbox MCSbackup MCShelp; do rm -f "/usr/local/bin/$t"; done
   systemctl daemon-reload
   [[ -n "${SUDO_USER:-}" ]] && gpasswd -d "$SUDO_USER" minecraft 2>&1 | tail -n 1
   userdel -r minecraft 2>&1 | tail -n 2; getent group minecraft >/dev/null && groupdel minecraft

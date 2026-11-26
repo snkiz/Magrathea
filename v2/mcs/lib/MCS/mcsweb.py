@@ -923,7 +923,7 @@ def api_backup_schedule_set(h, m, q, body):
 
 @route("GET", r"/api/settings")
 def api_settings(h, m, q, body):
-    return {"curseforge_available": bool(mf.CURSEFORGE_KEY),
+    return {"curseforge_available": mf.curseforge_available(),
             "listen": h.server.server_address[0], "port": h.server.server_address[1]}
 
 

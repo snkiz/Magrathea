@@ -1,0 +1,13 @@
+## The door to the MCS key broker. Installed (copied, root-owned) to /etc/systemd/system by MCSuser.
+[Unit]
+Description=MCS key broker socket
+
+[Socket]
+ListenStream=/run/MCScred.sock
+# The web page, MCSfetch and the servers run in this group. Every request is logged.
+SocketUser=root
+SocketGroup=minecraft
+SocketMode=0660
+
+[Install]
+WantedBy=sockets.target

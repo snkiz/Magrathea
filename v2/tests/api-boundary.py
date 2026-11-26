@@ -72,17 +72,14 @@ check("address is the platform base plus the route", req.full_url == "https://ap
 check("no API key sent to Modrinth", not req.has_header("X-api-key"))
 check("a route cannot change the host", refused(lambda: m.api_get("modrinth", ".evil.example/x"), "bad API route"))
 
-before = len(net.seen)
-check("CurseForge is off with no project key",
-      refused(lambda: m.api_get("curseforge", "/mods/1"), "not available in this build"))
-check("and nothing was sent", len(net.seen) == before)
-
-m.CURSEFORGE_KEY = "test-key-not-real"
+asked = []
+m.broker_ask = lambda request: asked.append(request) or {"ok": True, "body": '{"data": []}'}
 before = len(net.seen)
 m.api_get("curseforge", "/mods/1")
 m.api_get("curseforge", "/mods/1")
-check("the project key goes to CurseForge", net.seen[-1].get_header("X-api-key") == "test-key-not-real")
-check("CurseForge answers are never cached", len(net.seen) - before == 2)
+check("CurseForge requests go to the key broker", asked[0] == {"route": "/mods/1", "params": {}})
+check("and this program sends nothing to CurseForge itself", len(net.seen) == before)
+check("CurseForge answers are never cached", len(asked) == 2)
 
 before = len(net.seen)
 first = m.api_get("paper")

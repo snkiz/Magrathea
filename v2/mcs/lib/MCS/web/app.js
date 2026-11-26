@@ -462,7 +462,7 @@ async function tabMods(body, s) {
         results.replaceChildren(...(rows.length ? rows.map(resultRow) : [h("p", { class: "muted" }, "Nothing found for this version and loader (client-only mods are hidden).")]));
       } catch (x) { results.replaceChildren(h("p", { class: "err" }, x.message)); }
     } }, h("div", { class: "grow" }, q), src, h("button", { class: "btn primary", type: "submit" }, "Search")),
-    results, !isPlugin && !state.settings.curseforge_available ? h("p", { class: "muted small" }, "CurseForge search is not available in this build. You can still download from their site and upload the jar on the Files tab.") : null);
+    results, !isPlugin && !state.settings.curseforge_available ? h("p", { class: "muted small" }, "CurseForge search is not available: there is no key. You can still download from their site and upload the jar on the Files tab.") : null);
   function resultRow(r) {
     const installed = Object.values(info.mods || {}).some((m) => m.project === r.id || m.slug === r.id);
     return h("div", { class: "item" }, r.icon ? h("img", { class: "icon", src: r.icon, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }) : h("div", { class: "icon" }),
@@ -660,7 +660,7 @@ async function openCreate() {
 async function openSettings() {
   state.settings = await api("GET", "/api/settings").catch(() => state.settings);
   const bg = modal(h("div", {}, h("h2", {}, "Settings"),
-    h("p", { class: "small" }, state.settings.curseforge_available ? "Mod search: Modrinth and CurseForge." : "Mod search: Modrinth. CurseForge is not available in this build."),
+    h("p", { class: "small" }, state.settings.curseforge_available ? "Mod search: Modrinth and CurseForge." : "Mod search: Modrinth. CurseForge is not available: the owner can add a key on the server with sudo MCScred set curseforge."),
     h("p", { class: "muted small" }, `This interface is listening on ${state.settings.listen}:${state.settings.port}.`),
     h("div", { class: "row end" }, h("button", { class: "btn", onclick: () => bg.remove() }, "Close"))));
 }

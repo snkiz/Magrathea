@@ -1,0 +1,10 @@
+# The Magrathea project's CurseForge key: the last line of this file, not starting with "#".
+# CurseForge issues a key to a project, not to each person who runs it.
+#  * No key line means this build has no CurseForge. Modrinth works as normal.
+#  * The key belongs to this project. If you change the code and share it, put your own key
+#    here or leave it out.
+#  * Terms: https://support.curseforge.com/en/support/solutions/articles/9000207405
+#
+# MCSuser installs this file readable by root only. Only the key broker (mcscred.py) gets it,
+# so the minecraft user, and so mods, cannot read it on the machine.
+# An owner can use their own key instead: sudo MCScred set curseforge

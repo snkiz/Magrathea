@@ -25,6 +25,7 @@ import hashlib
 import json
 import os
 import re
+import socket
 import sys
 import tempfile
 import time
@@ -65,16 +66,7 @@ PLATFORMS = {
 }
 MOJANG_MANIFEST = "/mc/game/version_manifest_v2.json"
 MAX_WAIT = 60  # longest pause, in seconds, when a service says to slow down
-
-# --- CurseForge project key ------------------------------------------------
-# CurseForge issues a key to a project, not to each person who runs it. This line is the only
-# place MCS keeps it.
-#  * Empty means this build has no CurseForge. Modrinth works as normal.
-#  * The key belongs to this project. If you change the code and share it, put your own key
-#    here or leave it empty.
-#  * Terms: https://support.curseforge.com/en/support/solutions/articles/9000207405
-CURSEFORGE_KEY = ""
-# ---------------------------------------------------------------------------
+BROKER_SOCKET = "/run/MCScred.sock"  # CurseForge requests are made by the key broker, mcscred.py
 CF_GAME_MINECRAFT = 432
 CF_CLASS_MODS = 6
 CF_LOADERS = {"forge": 1, "fabric": 4, "quilt": 5, "neoforge": 6}
@@ -128,10 +120,28 @@ _cache: dict[str, tuple[float, bytes]] = {}  # in memory only: gone when the pro
 _wait_until: dict[str, float] = {}
 
 
-def cf_key() -> str:
-    if not CURSEFORGE_KEY:
-        raise McsError("CurseForge is not available in this build. Modrinth works without a key.")
-    return CURSEFORGE_KEY
+def broker_ask(request: dict) -> dict:
+    """Send one request to the key broker and return its reply."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(240)  # the broker may be waiting because CurseForge said to slow down
+            s.connect(BROKER_SOCKET)
+            # "claimed" is only a hint for the log; the broker finds out who is calling by itself
+            s.sendall(json.dumps({**request, "claimed": Path(sys.argv[0]).name}).encode() + b"\n")
+            with s.makefile("rb") as f:
+                reply = json.loads(f.read())
+    except (AttributeError, OSError, ValueError) as e:
+        raise McsError(f"CurseForge is not available: the MCS key broker did not answer ({e})") from None
+    if not reply.get("ok"):
+        raise McsError(reply.get("error") or "the MCS key broker refused the request")
+    return reply
+
+
+def curseforge_available() -> bool:
+    try:
+        return bool(broker_ask({"status": True}).get("available"))
+    except McsError:
+        return False
 
 
 def _seconds(value, default: float) -> float:
@@ -169,19 +179,21 @@ def _fetch(platform: str, url: str, headers: dict) -> bytes:
 
 def api_get(platform: str, route: str = "", params: dict | None = None):
     """The one way MCS asks an API something. Callers name the platform and the path under it,
-    never a whole address, so a key can only be sent to the service it belongs to."""
+    never a whole address, so a key can only be sent to the service it belongs to.
+    CurseForge needs a key, so those requests are handed to the key broker."""
     rules = PLATFORMS[platform]
     if route and not route.startswith("/"):
         raise McsError(f"bad API route {route!r}")
+    if platform == "curseforge":  # this program never holds the key, and nothing is cached
+        return json.loads(broker_ask({"route": route, "params": params or {}})["body"])
     url = rules["base"] + route
     if params:
         url += "?" + urllib.parse.urlencode(params)
     check_url(url)
-    headers = {"x-api-key": cf_key()} if platform == "curseforge" else {}
     hit = _cache.get(url)
     if rules["cache"] and hit and time.monotonic() - hit[0] < rules["cache"]:
         return json.loads(hit[1])
-    body = _fetch(platform, url, headers)
+    body = _fetch(platform, url, {})
     data = json.loads(body)
     if rules["cache"]:
         _cache[url] = (time.monotonic(), body)

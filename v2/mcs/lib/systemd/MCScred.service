@@ -1,0 +1,32 @@
+## The MCS key broker: makes CurseForge requests so nothing else holds the key.
+## Installed (copied, root-owned) to /etc/systemd/system by MCSuser. Started by MCScred.socket.
+[Unit]
+Description=MCS key broker (CurseForge)
+Requires=MCScred.socket
+After=MCScred.socket
+
+[Service]
+# A temporary user of its own: not root, not minecraft, owns nothing.
+DynamicUser=yes
+# The owner's own key, if any. Only root can read the folder; systemd hands the service a copy.
+LoadCredential=keys:/etc/MCS/cred
+ExecStart=/usr/bin/python3 -I -B /opt/mcs/lib/MCS/mcscred.py serve
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+# It never needs the servers or their files.
+InaccessiblePaths=-/opt/minecraft

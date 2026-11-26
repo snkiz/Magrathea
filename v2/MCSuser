@@ -69,7 +69,7 @@ render () {  # render <file> <destination>: the units are written for /opt/mcs a
   sed -e "s|/opt/mcs|$prefix|g" -e "s|/opt/minecraft|$mchome|g" "$1" > "$t"
   install -m 644 -o root -g root "$t" "$2"; rm -f "$t"
 }
-for u in MCS@.service MCS@.socket MCSweb.service MCSbackup.service MCSbackup.timer MCSoffbox.service MCSoffbox.timer; do
+for u in MCS@.service MCS@.socket MCScred.socket MCScred.service MCSweb.service MCSbackup.service MCSbackup.timer MCSoffbox.service MCSoffbox.timer; do
   render "$SKEL/lib/systemd/$u" "/etc/systemd/system/$u"
 done
 systemctl daemon-reload
@@ -103,6 +103,12 @@ printf '#!/bin/sh
 exec python3 -I %s/lib/MCS/mcskey.py "$@"
 ' "$prefix" > /usr/local/bin/MCSkey
 chmod 755 /usr/local/bin/MCSkey
+# The key broker: it makes the CurseForge requests. Only root can read an owner's own key.
+printf '#!/bin/sh
+# Added by MCSuser: run the root-owned MCScred tool (asks for sudo itself when it needs it).
+exec python3 -I -B %s/lib/MCS/mcscred.py "$@"
+' "$prefix" > /usr/local/bin/MCScred
+chmod 755 /usr/local/bin/MCScred
 # The owner's switch for RCON and the management server (asks for sudo itself).
 printf '#!/bin/sh
 # Added by MCSuser: run the root-owned MCSrcon tool (asks for sudo itself).
@@ -116,6 +122,10 @@ exec python3 -I %s/lib/MCS/mcsoffbox.py "$@"
 ' "$prefix" > /usr/local/bin/MCSoffbox
 chmod 755 /usr/local/bin/MCSoffbox
 install -d -m 750 -o root -g "$mcuser" /etc/MCS
+install -d -m 700 -o root -g root /etc/MCS/cred
+# The project's CurseForge key goes here, root only, not into the program folder. Updating replaces it.
+install -m 600 -o root -g root "$(dirname "$SKEL")/curseforge-project" /etc/MCS/cred/curseforge-project
+systemctl enable --now MCScred.socket >/dev/null 2>&1 || echo "NOTE: could not start the key broker; run: sudo systemctl enable --now MCScred.socket"
 [[ -f /etc/MCS/keys.json ]] && chown root:"$mcuser" /etc/MCS/keys.json && chmod 640 /etc/MCS/keys.json
 [[ -f /etc/MCS/remote.json ]] && chown root:"$mcuser" /etc/MCS/remote.json && chmod 640 /etc/MCS/remote.json
 
@@ -149,6 +159,8 @@ if command -v setfacl >/dev/null; then
 fi
 usermod -aG "$mcuser" "$SUDO_USER"
 
+# The broker starts again by itself on the next request, with the new program.
+systemctl try-restart MCScred.service 2>/dev/null || true
 # A web interface that is already running still has the old program loaded, so restart it.
 # try-restart does nothing if it is not running. Minecraft servers are not touched.
 if systemctl is-active --quiet MCSweb; then

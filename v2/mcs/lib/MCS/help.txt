@@ -60,7 +60,7 @@
 ##   MCSfetch player <instance> <name> [--op]   # whitelist a player           ##
 ##   Whitelist is ON. A running server needs: whitelist reload (console).       ##
 ##   The MCS tools are on your PATH (they run as the minecraft user via sudo).  ##
-##   Mod search uses Modrinth. CurseForge is not available in this build.      ##
+##   Mod search uses Modrinth. CurseForge needs a key: MCScred (see --help).   ##
 ## MCSbackup    # Scheduled backups (on by default, 04:00 daily, keeps 7).      ##
 ##   MCSbackup now <server>      # warn players, stop, copy, check, start again ##
 ##   MCSbackup list|restore|test|schedule <server> ...  (restore saves the      ##
