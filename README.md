@@ -67,7 +67,32 @@ Much of the code, including the Python and the permission setup, was written wit
 and the testing are the maintainer's. [Archive-v1](Archive-v1) is where the project started. It is the maintainer's own
 work, kept for history. Do not install it.
 
+### Why systemd
+
+Few public projects use systemd for more than starting things at boot. Magrathea leans on it for most of the
+plumbing, so there is less of its own code to read and trust. Each part below replaces something you would
+otherwise write by hand.
+
+- **One unit per server** (`MCS@.service`). `MCS@survival` is the server called survival. systemd runs it as the
+  `minecraft` user, restarts it if it crashes, stops it cleanly and sends its output to the journal.
+- **A console pipe** (`MCS@.socket`). Each server gets an input pipe that only the `minecraft` user can write to.
+  Commands from the web page reach the server through it.
+- **Timers** (`MCSbackup.timer`, `MCSoffbox.timer`). Scheduled backups and the off-box copy run from systemd
+  timers.
+- **The web page as a service** (`MCSweb.service`).
+- **A polkit rule** (`MCS.rules`). It lets the web page start, stop and restart MCS server units and nothing
+  else. It cannot enable units or touch any other service.
+- **A key broker** (`MCScred.socket`, `MCScred.service`). See Security.
+
+Considered, not used: socket activation, which starts a server on the first connection. It works in principle,
+but a Minecraft server boots too slowly, so the first player's client would time out.
+
 ## Security
+
+Keys for outside services are held by a key broker (`MCScred`); today that means CurseForge. It runs as a
+throwaway user of its own, and systemd hands it the keys from a root-only folder, so the `minecraft` user, and any
+mods, never see them. The web page and MCSfetch tell it what to ask over a local socket; it makes the request and
+hands back the answer, never the key.
 
 [SECURITY.md](SECURITY.md) says what was reviewed, what is still open, and how to report a problem.
 
