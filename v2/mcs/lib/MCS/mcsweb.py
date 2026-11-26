@@ -805,8 +805,10 @@ def api_update_mods(h, m, q, body):
     name = m.group(1)
     inst(name)
     apply_ = bool(body.get("apply"))
-    return cli_job(("Update mods" if apply_ else "Check for mod updates"),
-                   ["update", name] + (["--apply"] if apply_ else [])).to_dict()
+    argv = ["update", name] + (["--apply"] if apply_ else [])
+    if body.get("allow_beta"):
+        argv.append("--allow-beta")
+    return cli_job(("Update mods" if apply_ else "Check for mod updates"), argv).to_dict()
 
 
 @route("GET", r"/api/jobs/([0-9a-f]+)")

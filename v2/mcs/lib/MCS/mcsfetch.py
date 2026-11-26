@@ -559,6 +559,9 @@ def need_ctx(d: Path, a) -> dict:
     return meta
 
 
+BETA_HINT = 'only beta/alpha builds exist; tick "Allow test builds" on the web page, or use --allow-beta'
+
+
 class Resolver:
     """Works out which files to install: the mod plus its required dependencies."""
 
@@ -576,7 +579,7 @@ class Resolver:
             self._projects[ref] = api_get("modrinth", f"/project/{urllib.parse.quote(ref)}")
         return self._projects[ref]
 
-    def mr_version(self, project: str) -> dict:
+    def mr_version(self, project: str, title: str) -> dict:
         vs = api_get("modrinth", f"/project/{urllib.parse.quote(project)}/version", {
             "loaders": json.dumps(MR_LOADERS[self.loader]), "game_versions": json.dumps([self.mc])})
         vs.sort(key=lambda v: v["date_published"], reverse=True)
@@ -584,8 +587,8 @@ class Resolver:
         if not pick and self.allow_beta:
             pick = vs
         if not pick:
-            hint = " (only beta/alpha builds exist; use --allow-beta)" if vs else ""
-            raise McsError(f"{project}: no {self.loader} build for Minecraft {self.mc}{hint}")
+            hint = f" ({BETA_HINT})" if vs else ""
+            raise McsError(f"{title}: no {self.loader} build for Minecraft {self.mc}{hint}")
         return pick[0]
 
     def add_modrinth(self, ref: str, by: str | None, version_id: str | None = None, force: bool = False) -> None:
@@ -597,7 +600,7 @@ class Resolver:
             return
         if proj.get("server_side") == "unsupported":
             raise McsError(f"{proj['title']} is client-only and does nothing on a server")
-        v = api_get("modrinth", f"/version/{version_id}") if version_id else self.mr_version(proj["id"])
+        v = api_get("modrinth", f"/version/{version_id}") if version_id else self.mr_version(proj["id"], proj["title"])
         f = next((x for x in v["files"] if x.get("primary")), v["files"][0])
         hashes = {k: f["hashes"][k] for k in ("sha512", "sha1") if k in f["hashes"]}
         self.plan[key] = {"source": "modrinth", "project": proj["id"], "slug": proj["slug"],
@@ -642,7 +645,8 @@ class Resolver:
         files.sort(key=lambda x: x["fileDate"], reverse=True)
         pick = [x for x in files if x["releaseType"] == 1] or (files if self.allow_beta else [])
         if not pick:
-            raise McsError(f"{mod['name']}: no {self.loader} build for Minecraft {self.mc} on CurseForge")
+            hint = f" ({BETA_HINT})" if files else ""
+            raise McsError(f"{mod['name']}: no {self.loader} build for Minecraft {self.mc} on CurseForge{hint}")
         f = pick[0]
         if not f.get("downloadUrl"):
             site = (mod.get("links") or {}).get("websiteUrl", "")

@@ -424,10 +424,15 @@ async function tabMods(body, s) {
   } catch { /* no check, no card */ }
   /* server software */
   const typeSel = h("select", { "aria-label": "Server type" }, ["vanilla", "paper", "fabric"].map((t) => h("option", { value: t, selected: t === info.type }, t)));
-  const verSel = h("select", { "aria-label": "Minecraft version" }, h("option", { value: "latest" }, "latest"));
+  /* Start on the version this server already runs: picking up "latest" by accident would upgrade the world for good. */
+  const verSel = h("select", { "aria-label": "Minecraft version" });
+  const current = (v) => h("option", { value: v, selected: v === info.mc }, v);
   async function loadVersions() {
-    verSel.replaceChildren(h("option", { value: "latest" }, "latest"));
-    try { for (const v of await api("GET", `/api/versions?type=${typeSel.value}`)) verSel.append(h("option", { value: v }, v)); } catch (e) { toast(e.message, true); }
+    verSel.replaceChildren(h("option", { value: "latest" }, "latest"), ...(info.mc ? [current(info.mc)] : []));
+    try {
+      const list = await api("GET", `/api/versions?type=${typeSel.value}`);
+      verSel.replaceChildren(h("option", { value: "latest" }, "latest"), ...list.map(current));
+    } catch (e) { toast(e.message, true); }
   }
   typeSel.addEventListener("change", loadVersions); loadVersions();
   const jarCard = h("div", { class: "card" }, h("h2", {}, "Server software"),
@@ -448,6 +453,10 @@ async function tabMods(body, s) {
     !isPlugin && state.settings.curseforge_available ? h("option", { value: "curseforge" }, "CurseForge") : null,
     !isPlugin && state.settings.curseforge_available ? h("option", { value: "both" }, "Both") : null);
   const results = h("div", { class: "list" });
+  /* Off every time the tab is drawn: test builds are a choice made for this install, not a setting that stays on. */
+  const beta = h("input", { type: "checkbox" });
+  const betaRow = h("div", {}, h("label", { class: "chip" }, beta, ` Allow test builds (beta and alpha)`),
+    h("p", { class: "muted small" }, `Only used when a ${noun} has no finished release for ${info.mc}, for installing and updating. Test builds can crash the server or damage the world: back up first.`));
   /* Plain link-outs to the sites themselves: MCS never embeds or proxies their pages. */
   const mrBrowse = isPlugin ? "https://modrinth.com/plugins" : "https://modrinth.com/mods";
   const mrQuery = "?" + [info.loader ? `g=categories:${encodeURIComponent(info.loader)}` : "", info.mc ? `v=${encodeURIComponent(info.mc)}` : ""].filter(Boolean).join("&");
@@ -463,14 +472,14 @@ async function tabMods(body, s) {
         results.replaceChildren(...(rows.length ? rows.map(resultRow) : [h("p", { class: "muted" }, "Nothing found for this version and loader (client-only mods are hidden).")]));
       } catch (x) { results.replaceChildren(h("p", { class: "err" }, x.message)); }
     } }, h("div", { class: "grow" }, q), src, h("button", { class: "btn primary", type: "submit" }, "Search")),
-    results, !isPlugin && !state.settings.curseforge_available ? h("p", { class: "muted small" }, "CurseForge search is not available: there is no key. You can still download from their site and upload the jar on the Files tab.") : null);
+    betaRow, results, !isPlugin && !state.settings.curseforge_available ? h("p", { class: "muted small" }, "CurseForge search is not available: there is no key. You can still download from their site and upload the jar on the Files tab.") : null);
   function resultRow(r) {
     const installed = Object.values(info.mods || {}).some((m) => m.project === r.id || m.slug === r.id);
     return h("div", { class: "item" }, r.icon ? h("img", { class: "icon", src: r.icon, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }) : h("div", { class: "icon" }),
       h("div", { class: "grow" }, h("div", {}, h("strong", {}, r.title), " ", h("span", { class: "tag" }, r.source)),
         h("div", { class: "muted small" }, r.description), h("div", { class: "muted small" }, `${fmtNum(r.downloads)} downloads`)),
       h("div", { class: "row" }, r.url ? h("a", { href: r.url, target: "_blank", rel: "noopener noreferrer", class: "small" }, `View on ${r.source === "modrinth" ? "Modrinth" : "CurseForge"} ↗`) : null,
-        h("button", { class: "btn small primary", disabled: installed, onclick: () => okToChange(s.name, `Adding ${r.title}`) && startJob(api("POST", `/api/instances/${s.name}/mods`, { specs: [`${r.source}:${r.id}`], source: r.source }), changed(`${r.title} added`)) }, installed ? "Installed" : "Install")));
+        h("button", { class: "btn small primary", disabled: installed, onclick: () => okToChange(s.name, `Adding ${r.title}`) && startJob(api("POST", `/api/instances/${s.name}/mods`, { specs: [`${r.source}:${r.id}`], source: r.source, allow_beta: beta.checked }), changed(`${r.title} added`)) }, installed ? "Installed" : "Install")));
   }
   body.append(searchCard);
 
@@ -478,8 +487,8 @@ async function tabMods(body, s) {
   const mods = Object.entries(info.mods || {}).sort((a, b) => a[1].title.localeCompare(b[1].title));
   const pageUrl = (m) => m.source === "modrinth" ? `https://modrinth.com/project/${m.slug}` : (m.slug ? `https://www.curseforge.com/minecraft/mc-mods/${m.slug}` : null);
   body.append(h("div", { class: "card" }, h("div", { class: "row" }, h("h2", { class: "grow" }, `Installed ${noun}s`),
-    h("button", { class: "btn small", onclick: () => startJob(api("POST", `/api/instances/${s.name}/mods/update`, { apply: false })) }, "Check for updates"),
-    h("button", { class: "btn small", onclick: () => confirm("Install all available updates?") && okToChange(s.name, "Updating mods") && startJob(api("POST", `/api/instances/${s.name}/mods/update`, { apply: true }), changed("mods updated")) }, "Update all")),
+    h("button", { class: "btn small", onclick: () => startJob(api("POST", `/api/instances/${s.name}/mods/update`, { apply: false, allow_beta: beta.checked })) }, "Check for updates"),
+    h("button", { class: "btn small", onclick: () => confirm(beta.checked ? "Install all available updates, including test builds where there is no release?" : "Install all available updates?") && okToChange(s.name, "Updating mods") && startJob(api("POST", `/api/instances/${s.name}/mods/update`, { apply: true, allow_beta: beta.checked }), changed("mods updated")) }, "Update all")),
     mods.length ? h("div", { class: "list" }, mods.map(([key, m]) => h("div", { class: "item" },
       h("div", { class: "grow" }, h("strong", {}, m.title), " ", m.explicit ? null : h("span", { class: "tag" }, "dependency"), h("div", { class: "muted small" }, `${m.version} · ${m.file}`)),
       pageUrl(m) ? h("a", { class: "small", href: pageUrl(m), target: "_blank", rel: "noopener noreferrer" }, "View ↗") : null,
