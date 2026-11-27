@@ -1,7 +1,7 @@
 ## Author: snkiz
-## Sat 31 Aug 2024 04:11:32 AM EDT
-## License: Creative Commons. 
-## It's just some bash I cobbled together from bits of stack exchange.
+## Fri 27 Nov 2026
+## License: AGPL-3.0. 
+## It was just some bash I cobbled together from bits of stack exchange.
 
 ## The latest Official Mincraft server jar can be found here;
 ## *** https://www.minecraft.net/en-us/download/server ***
