@@ -42,6 +42,10 @@ const act = (p) => p.catch((e) => { toast(e.message, true); throw e; });
 /* ---------- login ---------- */
 function showLogin() {
   stopStreams();
+  clearInterval(state.poll);  // or each refresh gets "login required" and redraws this page, wiping what is being typed
+  /* Pop-ups, job output and messages sit outside the app's own box: take them down too, or they stay readable here. */
+  document.querySelectorAll(".modal-bg, .dock").forEach((el) => el.remove());
+  document.getElementById("toasts").replaceChildren();
   const err = h("div", { class: "err", role: "alert" });
   const input = h("input", { type: "password", id: "tok", autocomplete: "current-password", placeholder: "paste your key", required: true });
   $app.replaceChildren(h("div", { class: "login" }, h("form", { class: "card", onsubmit: async (e) => {
@@ -108,7 +112,8 @@ function buildShell() {
     footer()));
   if (!noticeUi.wired) {
     noticeUi.wired = true;  // click anywhere else, or press Escape, to close the list
-    document.addEventListener("click", (e) => { if (noticeUi.open && !e.target.closest("#notices, #noticebtn")) { noticeUi.open = false; renderNotices(); } });
+    /* Ask where the click started, not where its target is now: the button redraws its own label, which detaches what was clicked. */
+    document.addEventListener("click", (e) => { if (noticeUi.open && !e.composedPath().some((el) => el.id === "notices" || el.id === "noticebtn")) { noticeUi.open = false; renderNotices(); } });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && noticeUi.open) { noticeUi.open = false; renderNotices(); } });
   }
 }
@@ -410,7 +415,7 @@ function runJob(job, onDone) {
   const close = h("button", { class: "btn small", onclick: () => dock.remove() }, "Close");
   dock.append(h("div", { class: "card" }, h("div", { class: "row" }, title, stateEl, h("span", { class: "spacer" }), close), log));
   async function tick() {
-    let j; try { j = await api("GET", `/api/jobs/${job.id}`); } catch { return setTimeout(tick, 2000); }
+    let j; try { j = await api("GET", `/api/jobs/${job.id}`); } catch (e) { return e.message === "login required" ? dock.remove() : setTimeout(tick, 2000); }
     title.textContent = j.title; stateEl.textContent = j.state; stateEl.className = "badge " + (j.state === "done" ? "active" : j.state === "failed" ? "failed" : "activating");
     log.textContent = j.lines.join("\n"); log.scrollTop = log.scrollHeight;
     if (j.state === "running") return setTimeout(tick, 900);
@@ -692,7 +697,7 @@ function modal(content) {
 
 async function openCreate() {
   let eula = { agreed: true, port: 25565 };
-  try { eula = await api("GET", "/api/newserver"); } catch { /* ignore */ }
+  try { eula = await api("GET", "/api/newserver"); } catch (e) { if (e.message === "login required") return; /* else use the defaults */ }
   const name = h("input", { type: "text", id: "nn", maxlength: "64", placeholder: "survival", autocomplete: "off", required: true });
   const op = h("input", { type: "text", id: "op", maxlength: "16", placeholder: "YourMinecraftName", autocomplete: "off", required: true });
   const seed = h("input", { type: "text", id: "sd", maxlength: "128", placeholder: "blank = random", autocomplete: "off" });
@@ -713,7 +718,7 @@ async function openCreate() {
 }
 
 async function openSettings() {
-  state.settings = await api("GET", "/api/settings").catch(() => state.settings);
+  try { state.settings = await api("GET", "/api/settings"); } catch (e) { if (e.message === "login required") return; /* else show what is known */ }
   const season = h("input", { type: "checkbox", checked: !seasonOff, onchange: () => setSeasonOff(!season.checked) });
   const bg = modal(h("div", {}, h("h2", {}, "Settings"),
     h("div", { class: "field" }, h("label", { class: "chip" }, season, " Christmas colours"),
