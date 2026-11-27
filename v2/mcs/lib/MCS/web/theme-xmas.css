@@ -1,6 +1,6 @@
 /* Seasonal theme: Christmas. Deep forest green with a faint green tint in the greys.
-   NOT wired in yet. To use it, load this file AFTER style.css and put data-season="xmas" on <html>
-   (for example automatically from Dec 1 to Jan 1, or a switch in Settings).
+   Loaded after style.css; app.js puts data-season="xmas" on <html> from 1 December to 1 January,
+   unless it is switched off in Settings.
    Only colours change; fonts and layout stay as they are.
    The green is deliberately deep and muted so it stays clear of Modrinth's bright mint.
    "Running" stays a lighter green (--ok) and trouble stays red, so the accent does not mean "ok".
@@ -17,4 +17,9 @@
     --accent: #5cb377; --accent-ink: #08170d; --accent-soft: #2c4636; --danger: #ff7d7d; --warn: #e8cf4a;
     --ok: #8fd19e; --idle: #7d8a82; --console-bg: #151c18; --console-text: #e8efe9;
   }
+}
+/* A red pinstripe, edged in cream so it shows on the green, just inside the solid green buttons only. The others stay
+   plain, so red text still marks the buttons that stop or remove things. Drawn with a shadow: the focus outline is untouched. */
+:root[data-season="xmas"] .btn.primary {
+  box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 0 2px #f6f1e3, inset 0 0 0 3px #c4302b, inset 0 0 0 4px #f6f1e3;
 }

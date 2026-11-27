@@ -56,6 +56,23 @@ function showLogin() {
   input.focus();
 }
 
+/* ---------- seasonal colours ---------- */
+/* On from 1 December to 1 January by this computer's clock. The off switch is a per-browser preference, not a server setting. */
+const SEASON_KEY = "mcs-season-off";
+let seasonOff = false;
+try { seasonOff = localStorage.getItem(SEASON_KEY) === "1"; } catch { /* storage blocked: leave it on */ }
+const inSeason = (d = new Date()) => d.getMonth() === 11 || (d.getMonth() === 0 && d.getDate() === 1);
+function applySeason() {
+  if (inSeason() && !seasonOff) document.documentElement.dataset.season = "xmas";
+  else delete document.documentElement.dataset.season;
+}
+function setSeasonOff(off) {
+  seasonOff = off;
+  try { localStorage.setItem(SEASON_KEY, off ? "1" : "0"); } catch { /* private window: lasts until the page is closed */ }
+  applySeason();
+}
+applySeason();
+
 /* ---------- app shell ---------- */
 async function boot() {
   try {
@@ -70,7 +87,7 @@ async function boot() {
   refreshNotices();
   clearInterval(state.poll);
   let tick = 0;
-  state.poll = setInterval(() => { if (!document.hidden) { refreshServers(); if (++tick % 8 === 0) refreshNotices(); } }, 4000);
+  state.poll = setInterval(() => { if (!document.hidden) { applySeason(); refreshServers(); if (++tick % 8 === 0) refreshNotices(); } }, 4000);
 }
 
 /* Said once, in plain words, on every page. */
@@ -669,7 +686,10 @@ async function openCreate() {
 
 async function openSettings() {
   state.settings = await api("GET", "/api/settings").catch(() => state.settings);
+  const season = h("input", { type: "checkbox", checked: !seasonOff, onchange: () => setSeasonOff(!season.checked) });
   const bg = modal(h("div", {}, h("h2", {}, "Settings"),
+    h("div", { class: "field" }, h("label", { class: "chip" }, season, " Christmas colours"),
+      h("div", { class: "muted small" }, "Shown from 1 December to 1 January. Remembered in this browser only.")),
     h("p", { class: "small" }, state.settings.curseforge_available ? "Mod search: Modrinth and CurseForge." : "Mod search: Modrinth. CurseForge is not available: the owner can add a key on the server with sudo MCScred set curseforge."),
     h("p", { class: "muted small" }, `This interface is listening on ${state.settings.listen}:${state.settings.port}.`),
     h("div", { class: "row end" }, h("button", { class: "btn", onclick: () => bg.remove() }, "Close"))));
