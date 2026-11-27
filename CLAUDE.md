@@ -44,3 +44,14 @@ carries the plain version of this for readers.
 - Anything that touches login or keys, the web server and its routes, the downloader, file paths, the unit files, the
   sudo shims or permissions needs a security look before it goes in.
 - The plan and notes are kept privately, outside this repo. Ask the maintainer for the current priorities.
+
+## Issues: labels and milestones
+
+Issues are drafted in chat and posted by the maintainer. Use the repo's own labels and milestones.
+
+- Kind: `bug`, `enhancement`, `documentation`, `accessibility`.
+- Area: `Backend`, `Backup`, `MCScommand`, `WebUI`, `Wiki`, `Packaging`.
+- Triage: `duplicate`, `invalid`, `wontfix`, `question`, `help wanted`, `good first issue`.
+- Milestones: Release (what must be done before going public), Packaging, Loadouts (mod lists), Modrinth API key (the
+  operator's personal key), Geyser - Floodgate (one-click and easy), Paper server run (testing Paper in real use),
+  RPM (includes distrobox testing for atomic distros), WebUI theming (palettes, seasonal themes, fonts).

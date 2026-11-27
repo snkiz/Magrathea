@@ -25,7 +25,8 @@ installs and manages. You decide what runs. The commands start with `MCS`.
 
 ## What it does
 
-- Creates and runs vanilla, Paper and Fabric servers, each as its own systemd service.
+- Creates and runs vanilla, Paper and Fabric servers, each as its own systemd service. Paper starts, but hasn't been run in
+  real use yet.
 - Downloads server jars, and mods from Modrinth.
 - Turns the whitelist on by default.
 - Gives each person their own login key for the web page. Only the owner (root) can make or revoke keys.
@@ -86,6 +87,10 @@ otherwise write by hand.
 
 Considered, not used: socket activation, which starts a server on the first connection. It works in principle,
 but a Minecraft server boots too slowly, so the first player's client would time out.
+
+## Tips
+
+Magrathea is free. If it's useful to you, you can leave a tip on [Ko-fi](https://ko-fi.com/snkiz).
 
 ## Security
 
