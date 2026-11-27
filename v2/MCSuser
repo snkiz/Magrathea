@@ -173,3 +173,6 @@ then make yourself a login key (shown once, made only here on the server, needs 
   sudo MCSkey add <your name>
 and open http://localhost:8080. Each person gets their own key: sudo MCSkey list|revoke,
 and sudo MCSkey audit shows who did what. Only root can make or revoke keys."
+
+# Last, so a warning is not scrolled away. It only reports; the install is done either way.
+bash "$prefix/lib/MCS/mcscheck.sh" "$SUDO_USER" || true

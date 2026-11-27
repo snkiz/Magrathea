@@ -57,6 +57,10 @@ work but have not been tried. A physical machine (Debian) is the next thing to t
    `minecraft` group. Read it first if you like; it is commented. It is safe to run again: it
    replaces the program and leaves your servers and backups alone.
 
+   It ends by checking that the permissions MCS relies on behave as expected, and says if something is
+   worth a look. It only reports: it never changes anyone else's rules, and it is not a security audit.
+   To check again later: `sudo bash /opt/mcs/lib/MCS/mcscheck.sh`
+
 3. **Log out and back in** so your new group membership takes effect.
 
 ## Start the web page

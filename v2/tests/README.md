@@ -23,6 +23,7 @@ sudo bash tests/wsl-modcheck.sh                         # the mod pre-check
 sudo bash tests/wsl-remote.sh                           # RCON and the management server stay off unless allowed
 sudo bash tests/wsl-cred.sh                             # the key broker (removes any key set with MCScred)
 sudo bash tests/wsl-init.sh                             # the server jar completes server.properties
+sudo bash tests/wsl-check.sh                            # the install check notices bad rules (adds, then removes, some)
 sudo SUDO_USER=$USER bash tests/wsl-full.sh teardown    # remove everything again
 ```
 
