@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import gzip
 import hashlib
 import json
 import os
@@ -34,6 +35,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+import zlib
 from pathlib import Path
 
 VERSION = "2.0"
@@ -304,6 +306,110 @@ def save_meta(d: Path, meta: dict) -> None:
     write_atomic(d / "mcs.json", json.dumps(meta, indent=2, sort_keys=True) + "\n")
 
 
+MC_VERSION_RE = re.compile(r"[0-9][A-Za-z0-9._-]{0,30}")  # what a version recorded in mcs.json may look like
+_NBT_FIXED = {1: 1, 2: 2, 3: 4, 4: 8, 5: 4, 6: 8}  # level.dat tag types of a set size
+_NBT_ARRAY = {7: 1, 11: 4, 12: 8}                  # tag types that are a count, then that many items
+
+
+def _nbt_string(buf: bytes, path: tuple[str, ...]) -> str:
+    """The text at `path` in a level.dat (NBT) buffer, "" if there is none. ValueError if it is malformed."""
+    pos = 0
+
+    def take(n: int) -> bytes:
+        nonlocal pos
+        if pos + n > len(buf):
+            raise ValueError("cut short")
+        pos += n
+        return buf[pos - n:pos]
+
+    def num(n: int) -> int:
+        return int.from_bytes(take(n), "big")
+
+    def skip(tag: int, depth: int) -> None:
+        if depth > 64:
+            raise ValueError("nested too deeply")
+        if tag in _NBT_FIXED:
+            take(_NBT_FIXED[tag])
+        elif tag in _NBT_ARRAY:
+            take(num(4) * _NBT_ARRAY[tag])
+        elif tag == 8:
+            take(num(2))
+        elif tag == 9:  # a list: every item uses at least one byte or raises, so a false count cannot spin
+            item, count = num(1), num(4)
+            for _ in range(count):
+                skip(item, depth + 1)
+        elif tag == 10:
+            while inner := num(1):
+                take(num(2))
+                skip(inner, depth + 1)
+        else:
+            raise ValueError("unknown tag")
+
+    if num(1) != 10:
+        return ""
+    take(num(2))
+    for i, want in enumerate(path):
+        kind = 8 if i == len(path) - 1 else 10
+        while True:
+            tag = num(1)
+            if not tag:
+                return ""
+            name = take(num(2))
+            if tag == kind and name == want.encode():
+                break
+            skip(tag, 1)
+    return take(num(2)).decode("utf-8", "replace")
+
+
+def world_version(d: Path) -> str:
+    """The Minecraft version that last saved this server's world, "" if it does not say (before 1.9) or
+    cannot be read. The files belong to the server and its mods: treat the answer as a suggestion."""
+    try:
+        p = d / (read_prop(d, "level-name", "world") or "world") / "level.dat"
+        if not p.is_file() or not p.resolve().is_relative_to(d.resolve()):
+            return ""
+        with gzip.open(p, "rb") as g:
+            found = _nbt_string(g.read(16 << 20), ("Data", "Version", "Name"))
+    except (OSError, EOFError, ValueError, zlib.error):
+        return ""
+    return found if MC_VERSION_RE.fullmatch(found) else ""
+
+
+def jar_identity(path: Path) -> tuple[str, str]:
+    """(type, Minecraft version) of a server jar MCS recognises, else ("", ""). Nothing in it is run."""
+    def small(z: zipfile.ZipFile, member: str) -> str:
+        if z.getinfo(member).file_size > 65536:
+            raise ValueError("too big")
+        return z.read(member).decode("utf-8", "replace")
+
+    try:
+        with zipfile.ZipFile(path) as z:
+            main_class = re.search(r"^Main-Class:\s*(\S+)", small(z, "META-INF/MANIFEST.MF"), re.M)
+            cls = main_class.group(1) if main_class else ""
+            if cls == "net.fabricmc.installer.ServerLauncher":
+                found = re.search(r"^game-version=(\S+)", small(z, "install.properties"), re.M)
+                kind, mc = "fabric", found.group(1) if found else ""
+            elif cls in ("net.minecraft.bundler.Main", "net.minecraft.server.Main"):
+                kind, mc = "vanilla", str(json.loads(small(z, "version.json")).get("id", ""))
+            else:
+                return "", ""
+    except (OSError, KeyError, ValueError, AttributeError, zipfile.BadZipFile, zlib.error, RuntimeError, NotImplementedError):
+        return "", ""
+    return kind, mc if MC_VERSION_RE.fullmatch(mc) else ""
+
+
+def detect(d: Path, configured: str = "") -> dict:
+    """For a server with no record in mcs.json: what its files suggest it runs. Only reads.
+    `configured` is the jar service.conf names. Without one, the jars in the folder must agree."""
+    jars = sorted(p for p in d.glob("*.jar") if p.is_file())
+    pick = [p for p in jars if p.name == configured] or jars[:10]
+    seen = {x for x in (jar_identity(p) for p in pick) if x[0]}
+    kind, mc = seen.pop() if len(seen) == 1 else ("", "")
+    world = world_version(d)
+    return {"type": kind, "mc": mc or world, "mc_from": "the server jar" if mc else "your world" if world else "",
+            "world_mc": world, "has_jar": bool(jars)}
+
+
 def set_conf(path: Path, key: str, value: str) -> None:
     """Set KEY=value in a systemd EnvironmentFile, replacing the first
     uncommented KEY= line or appending one."""
@@ -541,6 +647,24 @@ def cmd_jar(a) -> int:
 # --------------------------------------------------------------------------
 def target_dir(d: Path, meta: dict) -> Path:
     return d / ("plugins" if meta.get("type") == "paper" else "mods")
+
+
+def cmd_record(a) -> int:
+    """Write down what a server already runs (one carried over from elsewhere). Downloads nothing."""
+    d = inst_dir(a.instance)
+    meta = load_meta(d)
+    if meta.get("type") and meta.get("mc"):
+        raise McsError(f"{a.instance} is already recorded as {meta['type']} {meta['mc']}; use 'MCSfetch jar' to change what it runs")
+    if not MC_VERSION_RE.fullmatch(a.mc):
+        raise McsError("give the Minecraft version the server actually runs, such as 1.21.11")
+    meta.update({"type": a.type, "mc": a.mc})
+    if a.type == "vanilla":
+        meta.pop("loader", None)
+    else:
+        meta["loader"] = a.type
+    save_meta(d, meta)
+    say(f"recorded {a.instance} as {a.type} {a.mc}. Nothing was downloaded, and the server jar was not changed.")
+    return 0
 
 
 def need_ctx(d: Path, a) -> dict:
@@ -1009,6 +1133,12 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--mc", default="latest", help="Minecraft version (default: latest release)")
     s.add_argument("-n", "--dry-run", action="store_true")
     s.set_defaults(fn=cmd_jar)
+
+    s = sub.add_parser("record", help="note what a server already runs, without downloading anything")
+    s.add_argument("instance")
+    s.add_argument("--type", choices=JAR_TYPES, required=True)
+    s.add_argument("--mc", required=True, help="the Minecraft version it runs")
+    s.set_defaults(fn=cmd_record)
 
     def ctx_args(sp, instance_optional=False):
         sp.add_argument("instance", nargs="?" if instance_optional else None)

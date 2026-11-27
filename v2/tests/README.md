@@ -27,7 +27,7 @@ sudo SUDO_USER=$USER bash tests/wsl-full.sh teardown    # remove everything agai
 ```
 
 `wsl-offbox-disk.sh` makes a small loop-mounted disk to test the separate copy on a real second device.
-`remote-control.py`, `broker.py` and `api-boundary.py` need only Python and are safe to run anywhere:
+`remote-control.py`, `broker.py`, `api-boundary.py` and `carried-server.py` need only Python and are safe to run anywhere:
 `python3 -I tests/remote-control.py`.
 
 The scripts print `PASS` and `FAIL` lines and end with a count; read the `FAIL` lines first.

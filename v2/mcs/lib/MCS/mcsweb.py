@@ -633,6 +633,8 @@ def api_instance(h, m, q, body):
     info = describe(name)
     info.update(conf=read_conf(d), jars=[f["name"] for f in list_files(name)["root"]], jdks=list_jdks(),
                 properties=read_props(d), mods=mf.load_meta(d).get("mods", {}))
+    recorded = bool(info["type"] and info["mc"])  # if not, offer what the files suggest; the world's version is always useful
+    info["detected"] = {"world_mc": mf.world_version(d)} if recorded else mf.detect(d, info["jar"])
     return info
 
 
@@ -758,6 +760,16 @@ def api_jar(h, m, q, body):
     if kind not in mf.JAR_TYPES or not re.fullmatch(r"latest|[0-9][A-Za-z0-9._-]{0,30}", mc):
         raise ApiError(400, "bad server type or version")
     return cli_job(f"Download {kind} {mc} for {name}", ["jar", name, "--type", kind, "--mc", mc]).to_dict()
+
+
+@route("POST", r"/api/instances/([^/]+)/record")
+def api_record(h, m, q, body):
+    name = m.group(1)
+    inst(name)
+    kind, mc = str(body.get("type", "")), str(body.get("mc", ""))
+    if kind not in mf.JAR_TYPES or not mf.MC_VERSION_RE.fullmatch(mc):
+        raise ApiError(400, "bad server type or version")
+    return cli_job(f"Record {name} as {kind} {mc}", ["record", name, "--type", kind, "--mc", mc]).to_dict()
 
 
 @route("GET", r"/api/instances/([^/]+)/search")

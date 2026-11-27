@@ -210,7 +210,7 @@ function renderSide() {
   side.replaceChildren(h("h3", {}, "Servers"),
     ...state.servers.map((s) => h("button", { class: "srv", "aria-current": s.name === state.current ? "page" : false, onclick: () => { location.hash = `#/s/${s.name}/${state.tab}`; } },
       h("span", { class: "dot " + s.state }),
-      h("span", {}, h("span", { class: "nm" }, s.name), h("span", { class: "sub" }, s.type ? `${s.type} ${s.mc}` : "no server jar yet")))),
+      h("span", {}, h("span", { class: "nm" }, s.name), h("span", { class: "sub" }, s.type ? `${s.type} ${s.mc}` : s.configured ? "version not recorded" : "no server jar yet")))),
     h("button", { class: "btn small", onclick: openCreate }, "+ New server"));
 }
 
@@ -440,29 +440,57 @@ async function tabMods(body, s) {
         h("div", { class: p.level === "bad" ? "err" : "" }, p.text), p.fix ? h("div", { class: "muted small" }, p.fix) : null, h("div", { class: "muted small mono" }, p.file)))))));
   } catch { /* no check, no card */ }
   /* server software */
-  const typeSel = h("select", { "aria-label": "Server type" }, ["vanilla", "paper", "fabric"].map((t) => h("option", { value: t, selected: t === info.type }, t)));
+  const found = info.detected || {};
+  const recorded = Boolean(info.type && info.mc);
+  /* A server with a world or a jar but no record was carried over from somewhere: never start it on "latest". */
+  const carried = !recorded && Boolean(found.world_mc || found.has_jar);
+  const startType = info.type || found.type || "";
+  const startMc = info.mc || found.mc || "";
+  const choose = (label) => h("option", { value: "", selected: true, disabled: true }, label);
+  const typeSel = h("select", { "aria-label": "Server type" }, carried && !startType ? choose("Choose a type") : null,
+    ["vanilla", "paper", "fabric"].map((t) => h("option", { value: t, selected: t === startType }, t)));
   /* Start on the version this server already runs: picking up "latest" by accident would upgrade the world for good. */
   const verSel = h("select", { "aria-label": "Minecraft version" });
-  const current = (v) => h("option", { value: v, selected: v === info.mc }, v);
   async function loadVersions() {
-    verSel.replaceChildren(h("option", { value: "latest" }, "latest"), ...(info.mc ? [current(info.mc)] : []));
-    try {
-      const list = await api("GET", `/api/versions?type=${typeSel.value}`);
-      verSel.replaceChildren(h("option", { value: "latest" }, "latest"), ...list.map(current));
-    } catch (e) { toast(e.message, true); }
+    const fill = (list) => verSel.replaceChildren(...[
+      carried && !startMc ? choose("Choose a version") : null,
+      h("option", { value: "latest" }, "latest"),
+      ...(startMc && !list.includes(startMc) ? [startMc] : []).concat(list).map((v) => h("option", { value: v, selected: v === startMc }, v)),
+    ].filter(Boolean));
+    fill([]);
+    try { fill(await api("GET", `/api/versions?type=${typeSel.value || "vanilla"}`)); } catch (e) { toast(e.message, true); }
   }
   typeSel.addEventListener("change", loadVersions); loadVersions();
+  /* Plain numbered releases only: for snapshots and the like, say nothing rather than guess. */
+  const older = (a, b) => {
+    if (![a, b].every((v) => /^\d+(\.\d+)+$/.test(v || ""))) return false;
+    const x = a.split(".").map(Number), y = b.split(".").map(Number);
+    for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0);
+    return false;
+  };
+  const picked = () => {
+    if (!typeSel.value || !verSel.value) { toast("Choose a type and a version first.", true); return false; }
+    return !older(verSel.value, found.world_mc) || confirm(`The world was last saved by Minecraft ${found.world_mc}. ${verSel.value} is older, and going backwards can damage it. Continue?`);
+  };
+  const guess = [found.type ? `${found.type} (from the server jar)` : "", found.mc ? `Minecraft ${found.mc} (from ${found.mc_from})` : ""].filter(Boolean).join(", ");
   const jarCard = h("div", { class: "card" }, h("h2", {}, "Server software"),
-    info.type ? h("p", { class: "muted" }, `Current: ${info.type} ${info.mc}` + (info.jar ? ` (${info.jar})` : "")) : h("div", { class: "note" }, "No server jar yet. Pick a type and version, then download. The right Java version is chosen for you."),
+    recorded ? h("p", { class: "muted" }, `Current: ${info.type} ${info.mc}` + (info.configured ? ` (${info.jar})` : ""))
+      : carried ? h("div", { class: "note warn" }, "MCS has no record of what this server runs. " + (guess ? `Its files suggest: ${guess}. Check it, change it if it is wrong, then press Use this.` : "Its files do not say. Choose what it actually runs, then press Use this.") + " That only writes it down: nothing is downloaded.")
+        : h("div", { class: "note" }, "No server jar yet. Pick a type and version, then download. The right Java version is chosen for you."),
     h("div", { class: "row" }, h("div", { class: "grow" }, typeSel), h("div", { class: "grow" }, verSel),
-      h("button", { class: "btn primary", disabled: serverBusy, title: serverBusy ? "Stop the server first" : false, onclick: () => {
+      carried ? h("button", { class: "btn primary", onclick: () => {
+        if (verSel.value === "latest") { toast("Choose the version this server actually runs, not \"latest\".", true); return; }
+        if (picked()) startJob(api("POST", `/api/instances/${s.name}/record`, { type: typeSel.value, mc: verSel.value }), refresh);
+      } }, "Use this") : null,
+      h("button", { class: carried ? "btn" : "btn primary", disabled: serverBusy, title: serverBusy ? "Stop the server first" : false, onclick: () => {
+        if (!picked()) return;
         if (info.mods && Object.keys(info.mods).length && !confirm("Changing the Minecraft version can break installed mods. Continue?")) return;
         startJob(api("POST", `/api/instances/${s.name}/jar`, { type: typeSel.value, mc: verSel.value }), refresh);
       } }, "Download")),
     h("p", { class: "muted small" }, "Forge and NeoForge are not supported yet: their downloads are installers, not server jars. Stop the server before changing its jar."));
   body.append(jarCard);
 
-  if (!info.loader) { body.append(h("div", { class: "note" }, "Vanilla servers take no mods. Choose Fabric (mods) or Paper (plugins) above.")); return; }
+  if (!info.loader) { body.append(h("div", { class: "note" }, recorded ? "Vanilla servers take no mods. Choose Fabric (mods) or Paper (plugins) above." : `Mod search appears once MCS knows what this server runs.`)); return; }
 
   /* search */
   const q = h("input", { type: "text", placeholder: `Search ${noun}s for ${info.mc}…`, "aria-label": `Search ${noun}s`, maxlength: "100" });
