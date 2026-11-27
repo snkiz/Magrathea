@@ -84,7 +84,7 @@ the management server, TLS or a reverse proxy.
 - [ ] Does every new route need a valid session, and every change-making route the `X-MCS` header (cross-site
       request guard)? The login stays the only open route.
 - [ ] Is the Host header still checked (DNS rebinding), and is the default bind still `127.0.0.1`? Network access
-      stays opt-in: no UPnP, never a bare internet-facing page.
+      to the page stays opt-in, never a bare internet-facing page.
 - [ ] Does all bad input get a clean 400, never a 500 or a dropped connection? Wrong JSON types, deep nesting,
       `NaN`/`Infinity`, bodies over the 1 MB cap (413), long or too many headers (431). (F-2, F-3, I-1)
 - [ ] Does every name (server, player, backup, file, mod) pass its pattern, and does every path stay inside its
@@ -96,6 +96,15 @@ the management server, TLS or a reverse proxy.
       `frame-ancestors 'none'`, `no-referrer`, `no-store` on login?
 - [ ] Is the lockout still keyed to the socket address, ignoring `X-Forwarded-For`? (Only an owner-enabled proxy
       mode, where nothing but the proxy can reach the port, may change that.)
+
+### Ports and mods' own networking
+
+- [ ] Does Magrathea's own code still never open router ports (no UPnP from us)?
+- [ ] Does the change leave mods' own networking alone: outgoing connections (a Discord bot) and extra ports
+      (voice chat's UDP port)? Mods are programs and may open ports or use UPnP themselves; that is the
+      operator's choice. Warn, don't block.
+- [ ] Does any port block target the RCON and management ports only? (An "allow only the game port" rule, such as
+      `SocketBindAllow=` with the game port alone, would also silently break voice chat and similar mods.)
 
 ### Remote control (RCON and the management server)
 
