@@ -70,7 +70,10 @@ systemctl daemon-reload
 systemctl enable --now MCSbackup.timer >/dev/null 2>&1 || echo "NOTE: could not enable the backup timer; run: sudo systemctl enable --now MCSbackup.timer"
 # polkit lets the web interface start/stop MCS@* units (and nothing else).
 if [[ -d /etc/polkit-1/rules.d ]]; then
-  install -m 644 -o root -g root "$SKEL/lib/systemd/MCS.rules" /etc/polkit-1/rules.d/50-mcs.rules
+  # Written beside it, then renamed into place: polkit reloads whenever this folder changes and
+  # must never read a half-written rule. A name not ending in .rules is ignored by polkit.
+  install -m 644 -o root -g root "$SKEL/lib/systemd/MCS.rules" /etc/polkit-1/rules.d/.50-mcs.tmp &&
+    mv -f /etc/polkit-1/rules.d/.50-mcs.tmp /etc/polkit-1/rules.d/50-mcs.rules
 else
   echo "NOTE: polkit is not installed, so the web interface cannot start/stop servers."
   echo "      Install it (Debian/Ubuntu: sudo apt install polkitd) and run MCSuser again."
