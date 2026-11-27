@@ -223,10 +223,29 @@ def console(name: str, text: str) -> bool:
         os.close(fd)
 
 
+class NotStopped(BackupError):
+    """systemctl would not stop the server, so it is still running as it was."""
+
+
+def systemctl_error(r: subprocess.CompletedProcess) -> str:
+    """What systemctl said when it failed. A refusal also gets a pointer to what decides it."""
+    said = (r.stderr or r.stdout).strip() or f"systemctl failed (exit {r.returncode})"
+    if re.search(r"access denied|authentication required", said, re.IGNORECASE):
+        said += ("\nThe system refused permission. polkit decides this: look in /etc/polkit-1/rules.d/ "
+                 "(MCS installs 50-mcs.rules; another rule there can override or break it) and run: "
+                 "sudo journalctl -u polkit")
+    return said
+
+
 def stop_server(name: str) -> None:
     say(f"stopping {name} (it saves the world first)...")
+    r = None
     with contextlib.suppress(subprocess.TimeoutExpired):
-        _sc("stop", f"MCS@{name}.service", timeout=240)
+        r = _sc("stop", f"MCS@{name}.service", timeout=240)
+    if r and r.returncode != 0:
+        state = unit_state(name)
+        if is_up(state) and state != "deactivating":  # not on its way down: waiting will not help
+            raise NotStopped(f"{name} could not be stopped, so nothing was done: {systemctl_error(r)}")
     for _ in range(60):
         if unit_state(name) not in ("active", "activating", "deactivating"):
             return
@@ -242,13 +261,24 @@ def start_server(name: str) -> None:
     except subprocess.TimeoutExpired:
         raise BackupError(f"the backup is safe, but {name} is taking too long to start again") from None
     if r.returncode != 0:
-        raise BackupError(f"the backup is safe, but {name} did not start again: {(r.stderr or r.stdout).strip()}")
+        raise BackupError(f"the backup is safe, but {name} did not start again: {systemctl_error(r)}")
 
 
 def restart_after(name: str) -> None:
     """Start the server again and forget that we stopped it."""
     start_server(name)
     set_state(name, stopped_for_backup=0)
+
+
+def stop_for_copy(name: str) -> None:
+    """Stop a running server before a backup or restore. The note is made first: if this process dies
+    now (restart of the web page, power cut), the timer sees it and starts the server again."""
+    set_state(name, stopped_for_backup=int(time.time()), recover_tries=0)
+    try:
+        stop_server(name)
+    except NotStopped:
+        set_state(name, stopped_for_backup=0)  # we did not stop it: never "start it again" later
+        raise
 
 
 def is_up(state: str) -> bool:
@@ -559,10 +589,11 @@ def _backup_clean(name: str, warn_minutes: int | None, only_if_changed: bool) ->
             if running:
                 countdown(name, warn)
                 down_start = time.time()
-                # If this process dies now (restart of the web page, power cut), the timer sees
-                # this note and starts the server again.
-                set_state(name, stopped_for_backup=int(time.time()), recover_tries=0)
-                stop_server(name)
+                try:
+                    stop_for_copy(name)
+                except NotStopped:
+                    running = False  # it never went down, so there is nothing to start again
+                    raise
             say(f"copying {name}...")
             final = make_archive(name, "clean", skipped)
             files = verify_archive(name, final)
@@ -804,8 +835,11 @@ def restore(name: str, fname: str) -> dict:
         old = None
         try:
             if running:
-                set_state(name, stopped_for_backup=int(time.time()), recover_tries=0)
-                stop_server(name)
+                try:
+                    stop_for_copy(name)
+                except NotStopped:
+                    running = False
+                    raise
             say("saving the current state first, so this restore can be undone...")
             pre = make_archive(name, "prerestore")
             say(f"saved {pre.name}")

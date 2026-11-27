@@ -279,7 +279,7 @@ def unit_action(name: str, action: str) -> None:
     run(["systemctl", "reset-failed", f"MCS@{name}.service", f"MCS@{name}.socket"])
     r = run(["systemctl", "--no-block", action, f"MCS@{name}.service"])
     if r.returncode != 0:
-        raise ApiError(500, (r.stderr or r.stdout).strip() or f"systemctl {action} failed")
+        raise ApiError(500, mb.systemctl_error(r))
 
 
 # --------------------------------------------------------------------------

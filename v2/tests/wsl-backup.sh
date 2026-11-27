@@ -128,6 +128,7 @@ real_sleep = time.sleep
 mb.time.sleep = lambda s: None          # no real waiting
 st = {"up": True}
 mb.unit_state = lambda n: "active" if st["up"] else "inactive"
+keep_stop = mb.stop_server
 mb.stop_server = lambda n: st.update(up=False)
 mb.start_server = lambda n: st.update(up=True)
 mb.countdown = lambda n, m: None
@@ -173,6 +174,22 @@ mb.stop_server = lambda n: (stops.append(n), st.update(up=False))
 mb.backup_clean("bk1", 0)
 t("a server still starting up is stopped before copying", stops == ["bk1"])
 mb.unit_state = lambda n: "active" if st["up"] else "inactive"; mb.stop_server = lambda n: st.update(up=False)
+
+# systemctl refuses to stop it: say why, copy nothing, and leave no note that would start it later
+import subprocess
+keep_sc = mb._sc
+mb.stop_server = keep_stop; st["up"] = True; calls = []
+def refuse(*a, **k):
+    calls.append(a[0])
+    return subprocess.CompletedProcess(a, 1, "", "Failed to stop MCS@bk1.service: Access denied")
+mb._sc = refuse
+before = set(os.listdir(mb.BACKUPS))
+try: mb.backup_clean("bk1", 0); why = ""
+except mb.BackupError as e: why = str(e)
+t("a refused stop reports what systemctl said and names polkit", "Access denied" in why and "polkit" in why)
+t("a refused stop copies nothing", set(os.listdir(mb.BACKUPS)) == before)
+t("a refused stop does not try to start the server, now or later", calls == ["stop"] and not mb.get_state("bk1").get("stopped_for_backup"))
+mb._sc = keep_sc; mb.stop_server = lambda n: st.update(up=False)
 
 # another backup running: the scheduled slot is not used up, it is tried again
 now = dt.datetime.now()
