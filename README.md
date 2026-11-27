@@ -115,8 +115,8 @@ AGPL-3.0, see [LICENSE](LICENSE). The bundled Shantell Sans font has its own lic
 
 You are free to fork Magrathea under the AGPL-3.0. A fork does not get the project's keys or art:
 
-- The CurseForge key in `v2/curseforge-project` was issued to this project. Remove it, or put your own in its
-  place.
+- The CurseForge key, (when approved) in `v2/curseforge-project` was issued to this project.
+  Remove it, or put your own in its place.
 - The art is not under the AGPL and does not come with a fork.
 - Give your fork its own name, and say that it is not Magrathea.
 
