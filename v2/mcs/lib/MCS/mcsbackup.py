@@ -635,7 +635,7 @@ def _test(name: str, src: Path) -> dict:
     free = shutil.disk_usage(INSTANCES).free
     if free < unpacked:
         return {"ok": None, "message": f"The file reads fine ({files} files), but there is not enough free space to unpack it for the full test (needs about {unpacked // 2**20} MB, has {free // 2**20} MB)."}
-    scratch = STAGING / f"test-{name}-{int(time.time())}"
+    scratch = _scratch("test", name, int(time.time()))
     try:
         scratch.mkdir(parents=True)
         with tarfile.open(src, "r:gz") as tf:
@@ -707,6 +707,63 @@ def _safe_extract(tf: tarfile.TarFile, dest: Path) -> None:
             raise BackupError(f"unexpected item in the archive: {m.name}")
 
 
+def _scratch(kind: str, name: str, stamp: int) -> Path:
+    """A folder in STAGING. kind: new (being unpacked), old (the folder just swapped out), test.
+    '~' cannot be part of a server name, so what a folder is can never be mistaken."""
+    return STAGING / f"{kind}~{name}~{stamp}"
+
+
+def _move_skipped(src: Path, dest: Path) -> None:
+    """Move the folders backups leave out (libraries, logs...) from one copy of a server to another."""
+    for sub in SKIP_TOP:
+        if (src / sub).exists() and not (dest / sub).exists():
+            os.rename(src / sub, dest / sub)
+
+
+def clean_leftovers() -> None:
+    """A restore or test that was cut off (crash, power cut, web page restarted) leaves folders in
+    STAGING. Put back whatever a server still needs, then delete the rest. Anything unclear is kept."""
+    if not STAGING.is_dir():
+        return
+    try:
+        with exclusive():  # restores and tests hold this lock, so anything found now was abandoned
+            found: dict = {}
+            for p in STAGING.iterdir():
+                m = re.fullmatch(r"(new|old|test)~([^~]+)~(\d+)", p.name)
+                if m and mf.NAME_RE.match(m.group(2)) and p.is_dir() and not p.is_symlink():
+                    found.setdefault((m.group(2), m.group(3)), {})[m.group(1)] = p
+            for (name, _stamp), parts in sorted(found.items()):
+                try:
+                    _clean_one(name, parts)
+                except OSError as e:
+                    say(f"{name}: could not tidy up after an interrupted restore, left in {STAGING}: {e}")
+    except Busy:
+        return  # something is using STAGING right now; next time
+
+
+def _clean_one(name: str, parts: dict) -> None:
+    d = INSTANCES / name
+    old, new = parts.get("old"), parts.get("new")
+    unswapped = new / name if new and (new / name).is_dir() else None  # unpacked, but never moved into place
+    cut_off = unswapped is not None
+    if old and not d.exists():  # stopped between the two halves of the swap: this is the only live copy
+        os.rename(old, d)
+        old = None
+        cut_off = True
+        say(f"{name}: a restore was interrupted; the server folder has been put back as it was")
+    elif old and unswapped:  # the folder was swapped out, yet something else now has its name
+        say(f"{name}: not touching {old}: it may be the only copy of the server from before an interrupted restore. "
+            "Check it, then delete it by hand")
+        return
+    if unswapped and d.is_dir():
+        _move_skipped(unswapped, d)
+    if cut_off and d.is_dir():
+        set_state(name, restore_interrupted=int(time.time()))
+    for p in (old, new, parts.get("test")):
+        if p:
+            shutil.rmtree(p, ignore_errors=True)
+
+
 def restore(name: str, fname: str) -> dict:
     """Put a backup back. The current state is saved first so this can be undone."""
     src = backup_path(name, fname)
@@ -720,7 +777,8 @@ def restore(name: str, fname: str) -> dict:
         if free < unpacked:
             raise BackupError(f"not enough disk space to restore: need about {unpacked // 2**20} MB free, have {free // 2**20} MB. Nothing was changed")
         running = is_up(unit_state(name))
-        staging = STAGING / f"{name}-{int(time.time())}"
+        stamp = int(time.time())
+        staging = _scratch("new", name, stamp)
         old = None
         try:
             if running:
@@ -736,10 +794,8 @@ def restore(name: str, fname: str) -> dict:
             new = staging / name
             if not new.is_dir():
                 raise BackupError("the archive does not contain the server folder")
-            for sub in SKIP_TOP:  # keep downloaded libraries so the server can start offline
-                if (d / sub).exists() and not (new / sub).exists():
-                    os.rename(d / sub, new / sub)
-            old = STAGING / f"{name}-old-{int(time.time())}"
+            _move_skipped(d, new)  # keep downloaded libraries so the server can start offline
+            old = _scratch("old", name, stamp)
             os.rename(d, old)
             try:
                 os.rename(new, d)
@@ -747,6 +803,7 @@ def restore(name: str, fname: str) -> dict:
                 os.rename(old, d)
                 old = None
                 raise
+            set_state(name, restore_interrupted=0)
             say("restored.")
         except Exception as e:
             if running:  # the restore failed before the swap: put the server back as it was
@@ -756,11 +813,14 @@ def restore(name: str, fname: str) -> dict:
                 raise BackupError(f"the restore failed and nothing was changed: {e}") from None
             raise
         finally:
-            shutil.rmtree(staging, ignore_errors=True)
             if old and not d.exists():  # never leave the server without a folder
                 with contextlib.suppress(OSError):
                     os.rename(old, d)
                     old = None
+            if (staging / name).is_dir() and d.is_dir():  # no swap: give the server back what was moved out of it
+                with contextlib.suppress(OSError):
+                    _move_skipped(staging / name, d)
+            shutil.rmtree(staging, ignore_errors=True)
         if old:
             shutil.rmtree(old, ignore_errors=True)
         if running:
@@ -780,10 +840,10 @@ def recover(name: str, state: dict) -> None:
             if tries >= 6:
                 return
             set_state(name, recover_tries=tries + 1)
-            say(f"{name}: it was stopped for a backup that never finished; starting it again")
+            say(f"{name}: it was stopped for a backup or restore that never finished; starting it again")
             restart_after(name)
             set_state(name, last_status="warning", last_time=int(time.time()),
-                      last_message="The server was left stopped by an interrupted backup, so it was started again.")
+                      last_message="The server was left stopped by an interrupted backup or restore, so it was started again.")
     except Busy:
         return  # a backup is running right now; it will start the server itself
     except BackupError as e:
@@ -797,6 +857,10 @@ def run_due() -> int:
     """Called by the timer. Handles every server whose slot has come."""
     rc = 0
     now = dt.datetime.now()
+    try:
+        clean_leftovers()  # first: a server may be missing its folder until this puts it back
+    except Exception as e:  # noqa: BLE001 - tidying must never stop the backups
+        say(f"could not tidy up after an interrupted restore: {e}")
     for d in sorted(INSTANCES.iterdir()) if INSTANCES.is_dir() else []:
         name = d.name
         if not d.is_dir() or not mf.NAME_RE.match(name):
@@ -855,6 +919,9 @@ def notices(name: str) -> list[dict]:
     def add(level: str, key: str, text: str) -> None:
         out.append({"id": f"{name}:{key}", "level": level, "server": name, "text": text, "tab": "backups"})
 
+    cut = state.get("restore_interrupted") or 0
+    if time.time() - cut < 7 * 86400:  # shown for a week, or until a restore succeeds
+        add("warn", f"interrupted-{cut}", f"A restore of {name} was interrupted and did not happen: the server is as it was before. Restore again if you still want to.")
     if not cfg["enabled"]:
         add("info", "off", f"Automatic backups are off for {name}. If something goes wrong there would be nothing to go back to.")
         return out

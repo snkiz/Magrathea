@@ -296,6 +296,77 @@ chmod 644 /tmp/bkx2.py
 as_mc "mkdir -p $I/bk3 && python3 -I /tmp/bkx2.py $LIBDIR" >/tmp/bkx2.out 2>&1; grep -Ev '^copying|^saved|^testing|^Backup tested|^NOT copied|^nobody' /tmp/bkx2.out; grep -q Traceback /tmp/bkx2.out && bad "players/links/tests script crashed"; rm -f /tmp/bkx2.py /tmp/bkx2.out
 F3=$(ls -1 $BK | grep '^bk3-[0-9]\{8\}-[0-9]\{6\}\.tar\.gz$' | tail -1)
 
+echo "-- a restore that dies partway (power cut, crash): tidied up by the timer"
+cat > /tmp/bkx3.py <<'EOF'
+import sys, os, json
+sys.path.insert(0, sys.argv[1])
+import mcsbackup as mb
+def t(d, ok): print(("PASS  " if ok else "FAIL  ") + d)
+d = mb.INSTANCES / "bk4"
+def left(): return sorted(p.name for p in mb.STAGING.iterdir()) if mb.STAGING.exists() else []
+def fresh():
+    mb.shutil.rmtree(d, ignore_errors=True); mb.shutil.rmtree(mb.STAGING, ignore_errors=True)
+    (d / "world").mkdir(parents=True); (d / "world" / "level.dat").write_text("old")
+    (d / "logs").mkdir(); (d / "logs" / "latest.log").write_text("log")
+    f = mb.make_archive("bk4", "clean").name
+    (d / "world" / "level.dat").write_text("current")
+    return f
+def die_at(f, module, attr, when):
+    """Run a restore in a child that is killed outright (no cleanup runs) at the chosen step."""
+    sys.stdout.flush()
+    pid = os.fork()
+    if pid == 0:
+        real = getattr(module, attr)
+        def hook(*a, **kw):
+            if when(*a): os._exit(9)
+            return real(*a, **kw)
+        setattr(module, attr, hook)
+        try: mb.restore("bk4", f)
+        finally: os._exit(0)
+    return os.waitstatus_to_exitcode(os.waitpid(pid, 0)[1]) == 9
+def world(): return (d / "world" / "level.dat").read_text()
+def logs(): return (d / "logs" / "latest.log").is_file()
+def noticed(): return any(x["id"].startswith("bk4:interrupted") for x in mb.notices("bk4"))
+
+mb.set_state("bk4", restore_interrupted=0)
+f = fresh(); ok = die_at(f, mb.os, "rename", lambda a, b: str(a).startswith(str(mb.STAGING)) and b == d)
+t("killed between the two halves of the swap: the server folder is gone", ok and not d.exists())
+mb.clean_leftovers()
+t("it is put back, with its logs, and the scratch space is empty", d.is_dir() and world() == "current" and logs() and left() == [])
+t("the banner says the restore did not happen", noticed())
+mb.set_config("bk4", {"enabled": False}); t("it still says so with automatic backups off", noticed()); mb.set_config("bk4", {"enabled": True})
+mb.set_state("bk4", restore_interrupted=1); t("the warning goes away after a week", not noticed())
+
+mb.set_state("bk4", restore_interrupted=0)
+f = fresh(); ok = die_at(f, mb.os, "rename", lambda a, b: a == d)
+t("killed just before the swap: logs are stranded in the scratch copy", ok and world() == "current" and not logs())
+mb.clean_leftovers()
+t("logs are given back and the scratch space is empty", world() == "current" and logs() and left() == [] and noticed())
+
+mb.set_state("bk4", restore_interrupted=0)
+f = fresh(); ok = die_at(f, mb.shutil, "rmtree", lambda p, *a: "old~" in str(p))
+t("killed after the swap: the old folder is left over", ok and world() == "old" and any(n.startswith("old~") for n in left()))
+mb.clean_leftovers()
+t("the restored world stays, the old folder goes, no false warning", world() == "old" and logs() and left() == [] and not noticed())
+
+f = fresh(); die_at(f, mb.os, "rename", lambda a, b: str(a).startswith(str(mb.STAGING)) and b == d)
+d.mkdir(); (d / "new-server").write_text("x")   # someone made a server with the same name in the meantime
+mb.clean_leftovers()
+t("a name reused after the crash: the old copy is kept, the new server untouched", any(n.startswith("old~") for n in left()) and (d / "new-server").is_file() and not logs())
+
+f = fresh(); die_at(f, mb.os, "rename", lambda a, b: a == d)
+with mb.exclusive():
+    before = left(); mb.clean_leftovers()
+    t("nothing is touched while a restore or backup holds the lock", before and left() == before)
+(mb.STAGING / "test~bk4~1").mkdir(); (mb.STAGING / "something-else").mkdir()
+mb.clean_leftovers()
+t("an abandoned test folder goes; an unrecognised folder is left alone", left() == ["something-else"])
+mb.shutil.rmtree(d, ignore_errors=True); mb.shutil.rmtree(mb.STAGING / "something-else")
+EOF
+chmod 644 /tmp/bkx3.py
+as_mc "python3 -I /tmp/bkx3.py $LIBDIR" >/tmp/bkx3.out 2>&1; grep -E '^(PASS|FAIL)|Traceback|Error' /tmp/bkx3.out; grep -q Traceback /tmp/bkx3.out && bad "interrupted-restore script crashed"; grep -q '^FAIL' /tmp/bkx3.out && fail=1; rm -f /tmp/bkx3.py /tmp/bkx3.out
+as_mc "rm -f $BK/bk4-* /opt/minecraft/.config/MCS/backup/bk4.json"
+
 echo "-- web page API"
 KEY="$(/usr/local/bin/MCSkey add "bk$$" --quiet)"
 req POST /api/login "{\"key\":\"$KEY\"}"; want "login" 200
