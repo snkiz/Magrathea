@@ -627,6 +627,29 @@ def test_backup(name: str, fname: str) -> dict:
     return res
 
 
+def _region_cut_short(mca: Path) -> bool:
+    """Is data missing from this region file? An empty file is fine. Minecraft does not always round the
+    file up to a full 4096-byte block, so an odd size alone means nothing: then follow the table at the
+    front and check that every chunk it lists is all there. A file of whole blocks is accepted without
+    looking inside, and chunks are never unpacked."""
+    size = mca.stat().st_size
+    if size % 4096 == 0 and size != 4096:
+        return False
+    if size < 8192:  # too short to hold the two tables every region file starts with
+        return True
+    with mca.open("rb") as f:
+        table = f.read(4096)
+        for i in range(0, 4096, 4):
+            start = int.from_bytes(table[i:i + 3], "big") * 4096  # 3 bytes: which block; 1 byte: how many
+            if not any(table[i:i + 4]):
+                continue
+            f.seek(start)
+            length = int.from_bytes(f.read(4), "big")  # each chunk begins with its own length
+            if start < 8192 or length == 0 or start + 4 + length > size:
+                return True
+    return False
+
+
 def _test(name: str, src: Path) -> dict:
     try:
         files, unpacked = _verify(name, src)
@@ -654,9 +677,8 @@ def _test(name: str, src: Path) -> dict:
                 problems.append(f"level.dat cannot be read ({e})")
             for mca in world.rglob("*.mca"):
                 regions += 1
-                size = mca.stat().st_size
-                if size % 4096 or 0 < size < 8192:
-                    problems.append(f"{mca.relative_to(root)} is damaged (wrong size)")
+                if _region_cut_short(mca):
+                    problems.append(f"{mca.relative_to(root)} is damaged (part of it is missing)")
         elif (INSTANCES / name / level / "level.dat").is_file():
             problems.append(f"the world folder '{level}' is missing from the backup")
         mods = 0
